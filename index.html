@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Office Supplies Portal</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; background:#f6f7fb; }
+    header { padding: 18px 24px; background:#111827; color:#fff; }
+    .wrap { max-width: 980px; margin: 24px auto; padding: 0 16px; }
+    .card { background:#fff; border-radius:12px; padding: 18px; box-shadow: 0 6px 18px rgba(0,0,0,.08); }
+    .row { display:flex; gap:12px; flex-wrap:wrap; }
+    input, select, button { padding:10px 12px; border-radius:10px; border:1px solid #d1d5db; }
+    button { border:none; background:#2563eb; color:#fff; cursor:pointer; }
+    button:hover { opacity:.92; }
+    .muted { color:#6b7280; }
+  </style>
+</head>
+<body>
+  <header>
+    <div><strong>Office Supplies</strong> <span class="muted">— Internal Requests</span></div>
+  </header>
+
+  <div class="wrap">
+    <div class="card">
+      <h2 style="margin-top:0">Nueva solicitud</h2>
+
+      <div class="row">
+        <input id="email" type="email" placeholder="Tu email (ej. jose@hyundaipr.com)" style="flex:1; min-width:240px;">
+        <select id="item">
+          <option value="">Selecciona artículo</option>
+          <option>Bolígrafos</option>
+          <option>Libretas</option>
+          <option>Carpetas</option>
+        </select>
+        <input id="qty" type="number" min="1" value="1" style="width:110px">
+        <button onclick="submitRequest()">Enviar</button>
+      </div>
+
+      <p class="muted" style="margin-bottom:0">
+        * Esto es un demo inicial (UI). Luego conectamos con SharePoint Lists y roles (Admin/User).
+      </p>
+
+      <pre id="out" style="margin-top:14px; background:#0b1220; color:#e5e7eb; padding:12px; border-radius:10px; overflow:auto;"></pre>
+    </div>
+  </div>
+
+  <script>
+    function submitRequest() {
+      const email = document.getElementById('email').value.trim();
+      const item  = document.getElementById('item').value.trim();
+      const qty   = Number(document.getElementById('qty').value);
+
+      const out = document.getElementById('out');
+
+      if (!email || !item || !qty || qty < 1) {
+        out.textContent = "Completa email, artículo y cantidad válida.";
+        return;
+      }
+
+      // Por ahora solo mostramos el payload (luego lo enviaremos a SharePoint/Flow/API)
+      const payload = {
+        email,
+        item,
+        qty,
+        created: new Date().toISOString()
+      };
+
+      out.textContent = "Solicitud preparada:\n" + JSON.stringify(payload, null, 2);
+    }
+  </script>
+</body>
+</html>
