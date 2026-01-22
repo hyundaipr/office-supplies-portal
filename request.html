@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Office Supply Request - Hyundai</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background-color: #f5f5f5;
+    }
+    .corporate-blue { background-color: #002c5f; }
+    .corporate-blue-light { background-color: #003d82; }
+    .corporate-border { border-color: #002c5f; }
+  </style>
+</head>
+<body class="min-h-screen bg-gray-100">
+  <div id="app"></div>
+
+  <script>
+    // Supply Catalog
+    const SUPPLY_CATALOG = [
+      { id: 1, name: 'Pens (blue)', category: 'Writing' },
+      { id: 2, name: 'Pens (black)', category: 'Writing' },
+      { id: 3, name: 'Pens (red)', category: 'Writing' },
+      { id: 4, name: 'Pencils #2', category: 'Writing' },
+      { id: 5, name: 'Permanent markers', category: 'Writing' },
+      { id: 6, name: 'Highlighters', category: 'Writing' },
+      { id: 7, name: 'Manila folders', category: 'Filing' },
+      { id: 8, name: 'Hanging folders', category: 'Filing' },
+      { id: 9, name: 'Notebooks (letter size)', category: 'Paper' },
+      { id: 10, name: 'Notebooks (pocket)', category: 'Paper' },
+      { id: 11, name: 'Post-it notes', category: 'Paper' },
+      { id: 12, name: 'Letter paper (ream)', category: 'Paper' },
+      { id: 13, name: 'Paper clips (box)', category: 'Fasteners' },
+      { id: 14, name: 'Staples (box)', category: 'Fasteners' },
+      { id: 15, name: 'Stapler', category: 'Fasteners' },
+      { id: 16, name: 'Hole punch', category: 'Fasteners' },
+      { id: 17, name: 'Tape', category: 'Adhesives' },
+      { id: 18, name: 'Glue stick', category: 'Adhesives' },
+      { id: 19, name: 'Correction fluid', category: 'Writing' },
+      { id: 20, name: 'Scissors', category: 'Tools' },
+    ];
+
+    // SVG Icons
+    const icons = {
+      plus: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>',
+      trash: '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>',
+      send: '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>',
+      check: '<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>',
+      mail: '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>'
+    };
+
+    // Helpers
+    function todayISO() {
+      const d = new Date();
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    }
+
+    function formatDateDisplay(isoOrAny) {
+      // If it's ISO yyyy-mm-dd, format to en-US. Else return as-is.
+      if (typeof isoOrAny === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(isoOrAny)) {
+        const [y, m, d] = isoOrAny.split('-').map(Number);
+        const dt = new Date(y, m - 1, d);
+        return dt.toLocaleDateString('en-US');
+      }
+      return String(isoOrAny || '');
+    }
+
+    function safeFilenamePart(str) {
+      // Remove Windows-invalid characters and collapse whitespace
+      return String(str || '')
+        .trim()
+        .replace(/[\/\\:*?"<>|]/g, '')
+        .replace(/\s+/g, '_')
+        .replace(/_+/g, '_')
+        .slice(0, 60) || 'User';
+    }
+
+    const MAX_SAVED_REQUESTS = 50;
+
+    // Application state
+    let state = {
+      formData: {
+        name: '',
+        department: '',
+        position: '',
+        contactExt: '',
+        email: '',
+        date: todayISO() // CHANGED: store ISO to match <input type="date">
+      },
+      requestedItems: [],
+      submitted: false,
+      requests: [],
+      showingInstructions: false,
+      lastSubmittedRequest: null,
+      mailLaunchFailed: false
+    };
+
+    // Load requests from localStorage
+    function loadRequests() {
+      const saved = localStorage.getItem('officeSupplyRequests');
+      if (saved) {
+        try {
+          state.requests = JSON.parse(saved) || [];
+        } catch (e) {
+          state.requests = [];
+        }
+      }
+    }
+
+    // Save requests (with cap)
+    function saveRequests() {
+      if (state.requests.length > MAX_SAVED_REQUESTS) {
+        state.requests = state.requests.slice(-MAX_SAVED_REQUESTS);
+      }
+      localStorage.setItem('officeSupplyRequests', JSON.stringify(state.requests));
+    }
+
+    function clearHistory() {
+      if (!confirm('Clear all saved requests from this browser?')) return;
+      state.requests = [];
+      localStorage.removeItem('officeSupplyRequests');
+      render();
+    }
+
+    // Add item
+    function addItem() {
+      state.requestedItems.push({ id: Date.now(), itemId: '', quantity: 1 });
+      render();
+    }
+
+    // Remove item
+    function removeItem(id) {
+      state.requestedItems = state.requestedItems.filter(item => item.id !== id);
+      render();
+    }
+
+    // Update item
+    function updateItem(id, field, value) {
+      const item = state.requestedItems.find(i => i.id === id);
+      if (item) {
+        item[field] = value;
+        render();
+      }
+    }
+
+    // Update form data
+    function updateFormData(field, value) {
+      state.formData[field] = value;
+      // NOTE: no render here by design (same as your style)
+    }
+
+    // Generate PDF
+    function generatePDF(requestData) {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+
+      // Title
+      doc.setFontSize(18);
+      doc.setFont(undefined, 'bold');
+      doc.text('OFFICE SUPPLIES REQUISITION FORM', 105, 20, { align: 'center' });
+
+      // Separator line
+      doc.setLineWidth(0.5);
+      doc.line(20, 25, 190, 25);
+
+      // Requester information
+      doc.setFontSize(12);
+      doc.setFont(undefined, 'bold');
+      doc.text('REQUESTER INFORMATION', 20, 35);
+
+      doc.setFont(undefined, 'normal');
+      doc.setFontSize(10);
+      let y = 45;
+      doc.text(`Name: ${requestData.name}`, 20, y);
+      doc.text(`Date: ${formatDateDisplay(requestData.date)}`, 120, y); // CHANGED
+      y += 7;
+      doc.text(`Department: ${requestData.department}`, 20, y);
+      doc.text(`Position: ${requestData.position}`, 120, y);
+      y += 7;
+      doc.text(`Extension: ${requestData.contactExt || 'N/A'}`, 20, y);
+      doc.text(`Email: ${requestData.email}`, 120, y);
+
+      // Separator line
+      y += 10;
+      doc.line(20, y, 190, y);
+
+      // Requested items
+      y += 10;
+      doc.setFont(undefined, 'bold');
+      doc.setFontSize(12);
+      doc.text('REQUESTED ITEMS', 20, y);
+
+      y += 10;
+      doc.setFont(undefined, 'bold');
+      doc.setFontSize(10);
+      doc.text('Item Description', 20, y);
+      doc.text('Quantity', 150, y);
+
+      y += 5;
+      doc.line(20, y, 190, y);
+
+      // Items list
+      doc.setFont(undefined, 'normal');
+      requestData.items.forEach((item, index) => {
+        y += 8;
+        if (y > 270) {
+          doc.addPage();
+          y = 20;
+        }
+        doc.text(`${index + 1}. ${item.itemName}`, 20, y);
+        doc.text(`${item.quantity}`, 150, y);
+      });
+
+      // Footer
+      y += 20;
+      if (y > 250) {
+        doc.addPage();
+        y = 20;
+      }
+      doc.line(20, y, 190, y);
+      y += 10;
+      doc.setFontSize(9);
+      doc.text('FOR ADMINISTRATION USE ONLY', 20, y);
+      y += 10;
+      doc.text('AVP Approval: _______________________   Date: _______________', 20, y);
+      y += 7;
+      doc.text('Processed By: _______________________   Completion Date: _______________', 20, y);
+
+      // Company footer
+      y += 15;
+      doc.setFontSize(8);
+      doc.setTextColor(100);
+      doc.text('Sojitz de Puerto Rico dba Hyundai de Puerto Rico', 105, y, { align: 'center' });
+
+      // Generate PDF (CHANGED: sanitize name)
+      const pdfName = `Supply_Request_${safeFilenamePart(requestData.name)}_${Date.now()}.pdf`;
+      doc.save(pdfName);
+
+      return pdfName;
+    }
+
+    // Open Outlook email (with fallback detection)
+    function openOutlookEmail(requestData) {
+      const subject = `Office Supply Request - ${requestData.name} - ${requestData.department}`;
+
+      const body = `Hi,
+
+A new office supply request has been submitted.
+
+REQUESTER INFORMATION:
+Name: ${requestData.name}
+Department: ${requestData.department}
+Position: ${requestData.position}
+Extension: ${requestData.contactExt || 'N/A'}
+Email: ${requestData.email}
+Date: ${formatDateDisplay(requestData.date)}
+
+REQUESTED ITEMS:
+${requestData.items.map((item, index) => `${index + 1}. ${item.itemName} - Quantity: ${item.quantity}`).join('\n')}
+
+Please find the detailed PDF attached to this email.
+
+Best regards,
+Office Supply System`;
+
+      const mailto = `mailto:jsolivan@hyundaipr.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+
+      // CHANGED: use window.open so we can detect block; if blocked show button
+      const w = window.open(mailto, '_blank');
+      const blocked = !w;
+
+      if (blocked) {
+        state.mailLaunchFailed = true;
+        render();
+      } else {
+        state.mailLaunchFailed = false;
+      }
+    }
+
+    // Submit request
+    function handleSubmit() {
+      // CHANGED: use native validation first
+      const nameEl = document.getElementById('name');
+      const deptEl = document.getElementById('department');
+      const posEl = document.getElementById('position');
+      const emailEl = document.getElementById('email');
+      const dateEl = document.getElementById('date');
+
+      // If any required fields invalid, show native browser messages
+      if (![nameEl, deptEl, posEl, emailEl].every(el => el && el.checkValidity())) {
+        [nameEl, deptEl, posEl, emailEl].forEach(el => el && el.reportValidity());
+        return;
+      }
+
+      // Ensure date is stored from input
+      if (dateEl && dateEl.value) {
+        state.formData.date = dateEl.value; // ISO
+      }
+
+      if (state.requestedItems.length === 0) {
+        alert('Please add at least one item to your request');
+        return;
+      }
+
+      if (state.requestedItems.some(item => !item.itemId)) {
+        alert('Please select an item for each line');
+        return;
+      }
+
+      const requestData = {
+        id: Date.now(),
+        ...state.formData,
+        items: state.requestedItems.map(item => ({
+          ...item,
+          itemName: SUPPLY_CATALOG.find(s => s.id === parseInt(item.itemId))?.name || ''
+        })),
+        submittedAt: new Date().toISOString(),
+        status: 'Pending'
+      };
+
+      state.requests.push(requestData);
+      saveRequests();
+
+      state.lastSubmittedRequest = requestData;
+
+      // Generate PDF
+      generatePDF(requestData);
+
+      // Email open attempt shortly after PDF save
+      setTimeout(() => {
+        openOutlookEmail(requestData);
+      }, 350);
+
+      state.submitted = true;
+      state.showingInstructions = true;
+      render();
+
+      setTimeout(() => {
+        state.showingInstructions = false;
+        state.submitted = false;
+        state.mailLaunchFailed = false;
+        state.lastSubmittedRequest = null;
+        state.formData = {
+          name: '',
+          department: '',
+          position: '',
+          contactExt: '',
+          email: '',
+          date: todayISO()
+        };
+        state.requestedItems = [];
+        render();
+      }, 9000);
+    }
+
+    function retryOpenEmail() {
+      if (state.lastSubmittedRequest) {
+        openOutlookEmail(state.lastSubmittedRequest);
+      }
+    }
+
+    // Render the application
+    function render() {
+      const app = document.getElementById('app');
+
+      if (state.submitted) {
+        app.innerHTML = `
+          <div class="min-h-screen flex items-center justify-center p-4">
+            <div class="bg-white shadow-lg p-8 max-w-2xl w-full text-center border-t-4 corporate-border">
+              <div class="text-green-600 mx-auto mb-4">${icons.check}</div>
+              <h2 class="text-2xl font-bold text-gray-900 mb-4">Request Submitted Successfully!</h2>
+
+              ${state.showingInstructions ? `
+                <div class="bg-blue-50 border-l-4 border-blue-900 p-6 mb-4 text-left">
+                  <h3 class="font-bold text-blue-900 mb-3 flex items-center gap-2">
+                    ${icons.mail}
+                    Next Steps:
+                  </h3>
+                  <ol class="space-y-3 text-gray-700">
+                    <li class="flex gap-2">
+                      <span class="font-bold text-blue-900">1.</span>
+                      <span>The PDF has been downloaded to your computer</span>
+                    </li>
+                    <li class="flex gap-2">
+                      <span class="font-bold text-blue-900">2.</span>
+                      <span>Outlook should open automatically with a pre-filled email</span>
+                    </li>
+                    <li class="flex gap-2">
+                      <span class="font-bold text-blue-900">3.</span>
+                      <span>Simply drag and drop the PDF file into the Outlook email</span>
+                    </li>
+                    <li class="flex gap-2">
+                      <span class="font-bold text-blue-900">4.</span>
+                      <span>Click "Send" and you're done!</span>
+                    </li>
+                  </ol>
+
+                  ${state.mailLaunchFailed ? `
+                    <div class="mt-5 p-4 bg-white border border-blue-200">
+                      <p class="text-sm text-gray-700 mb-3">
+                        Your browser may have blocked the email window. Click below to open the email again:
+                      </p>
+                      <button onclick="retryOpenEmail()"
+                        class="px-5 py-2 corporate-blue text-white hover:opacity-90 transition-opacity font-semibold uppercase text-sm tracking-wide">
+                        Open Email
+                      </button>
+                    </div>
+                  ` : ``}
+                </div>
+              ` : ''}
+
+              <p class="text-gray-600">Your request has been saved and is pending approval.</p>
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      app.innerHTML = `
+        <!-- Header -->
+        <div class="corporate-blue text-white py-6 shadow-md">
+          <div class="max-w-6xl mx-auto px-4">
+            <h1 class="text-3xl font-bold tracking-wide">OFFICE SUPPLY REQUEST</h1>
+            <p class="text-blue-200 mt-1">Hyundai de Puerto Rico</p>
+          </div>
+        </div>
+
+        <div class="max-w-6xl mx-auto p-6">
+          <!-- Main Form -->
+          <div class="bg-white shadow-md mb-6 border-t-4 corporate-border">
+            <div class="p-8">
+              <h2 class="text-xl font-bold text-gray-900 mb-6 pb-3 border-b-2 border-gray-200">REQUESTER INFORMATION</h2>
+
+              <!-- Requester Information -->
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                <div>
+                  <label for="name" class="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-wide">Full Name *</label>
+                  <input type="text" id="name" required value="${state.formData.name}"
+                    class="w-full px-4 py-3 border-2 border-gray-300 focus:border-blue-900 focus:outline-none transition-colors"
+                    placeholder="John Doe">
+                </div>
+
+                <div>
+                  <label for="date" class="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-wide">Date</label>
+                  <input type="date" id="date" value="${state.formData.date}"
+                    class="w-full px-4 py-3 border-2 border-gray-300 focus:border-blue-900 focus:outline-none transition-colors">
+                </div>
+
+                <div>
+                  <label for="department" class="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-wide">Department *</label>
+                  <input type="text" id="department" required value="${state.formData.department}"
+                    class="w-full px-4 py-3 border-2 border-gray-300 focus:border-blue-900 focus:outline-none transition-colors"
+                    placeholder="e.g., Human Resources">
+                </div>
+
+                <div>
+                  <label for="position" class="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-wide">Position *</label>
+                  <input type="text" id="position" required value="${state.formData.position}"
+                    class="w-full px-4 py-3 border-2 border-gray-300 focus:border-blue-900 focus:outline-none transition-colors"
+                    placeholder="e.g., Analyst">
+                </div>
+
+                <div>
+                  <label for="contactExt" class="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-wide">Extension</label>
+                  <input type="text" id="contactExt" value="${state.formData.contactExt}"
+                    class="w-full px-4 py-3 border-2 border-gray-300 focus:border-blue-900 focus:outline-none transition-colors"
+                    placeholder="e.g., 1234">
+                </div>
+
+                <div>
+                  <label for="email" class="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-wide">Email *</label>
+                  <input type="email" id="email" required value="${state.formData.email}"
+                    class="w-full px-4 py-3 border-2 border-gray-300 focus:border-blue-900 focus:outline-none transition-colors"
+                    placeholder="johndoe@hyundaipr.com">
+                </div>
+              </div>
+
+              <!-- Requested Items -->
+              <div class="mb-8">
+                <div class="flex items-center justify-between mb-4 pb-3 border-b-2 border-gray-200">
+                  <h2 class="text-xl font-bold text-gray-900 uppercase tracking-wide">Requested Items</h2>
+                  <button onclick="addItem()" class="flex items-center gap-2 px-5 py-2 corporate-blue text-white hover:opacity-90 transition-opacity font-semibold uppercase text-sm tracking-wide">
+                    ${icons.plus}
+                    Add Item
+                  </button>
+                </div>
+
+                <div id="items-container">
+                  ${state.requestedItems.length === 0 ? `
+                    <div class="text-center py-12 bg-gray-50 border-2 border-dashed border-gray-300">
+                      <p class="text-gray-500 font-medium">No items in your request. Click "Add Item" to begin.</p>
+                    </div>
+                  ` : `
+                    <table class="w-full border-collapse">
+                      <thead>
+                        <tr class="bg-gray-50 border-b-2 border-gray-300">
+                          <th class="text-left py-3 px-4 font-bold text-gray-700 uppercase text-sm">Item Description</th>
+                          <th class="text-center py-3 px-4 font-bold text-gray-700 uppercase text-sm w-32">Quantity</th>
+                          <th class="w-16"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        ${state.requestedItems.map((item) => `
+                          <tr class="border-b border-gray-200 hover:bg-gray-50">
+                            <td class="py-3 px-4">
+                              <label class="sr-only" for="item-${item.id}">Item Description</label>
+                              <select id="item-${item.id}" class="w-full px-3 py-2 border-2 border-gray-300 focus:border-blue-900 focus:outline-none transition-colors" required>
+                                <option value="">Select an item...</option>
+                                ${SUPPLY_CATALOG.map(supply => `
+                                  <option value="${supply.id}" ${item.itemId == supply.id ? 'selected' : ''}>
+                                    ${supply.name} (${supply.category})
+                                  </option>
+                                `).join('')}
+                              </select>
+                            </td>
+                            <td class="py-3 px-4">
+                              <label class="sr-only" for="qty-${item.id}">Quantity</label>
+                              <input type="number" min="1" value="${item.quantity}" id="qty-${item.id}"
+                                class="w-full px-3 py-2 border-2 border-gray-300 focus:border-blue-900 focus:outline-none transition-colors text-center">
+                            </td>
+                            <td class="py-3 px-4 text-center">
+                              <button onclick="removeItem(${item.id})" class="p-2 text-red-600 hover:bg-red-50 transition-colors" aria-label="Remove item">
+                                ${icons.trash}
+                              </button>
+                            </td>
+                          </tr>
+                        `).join('')}
+                      </tbody>
+                    </table>
+                  `}
+                </div>
+              </div>
+
+              <!-- Submit Button -->
+              <button onclick="handleSubmit()" class="w-full flex items-center justify-center gap-2 px-6 py-4 bg-green-700 text-white hover:bg-green-800 transition-colors font-bold text-lg uppercase tracking-wide shadow-md">
+                ${icons.send}
+                Submit Request
+              </button>
+            </div>
+          </div>
+
+          <!-- Request History -->
+          ${state.requests.length > 0 ? `
+            <div class="bg-white shadow-md border-t-4 corporate-border">
+              <div class="p-8">
+                <div class="flex items-center justify-between mb-6 pb-3 border-b-2 border-gray-200">
+                  <h2 class="text-xl font-bold text-gray-900 uppercase tracking-wide">Recent Requests</h2>
+                  <button onclick="clearHistory()" class="px-4 py-2 border-2 border-gray-300 hover:bg-gray-50 transition-colors font-semibold uppercase text-sm tracking-wide">
+                    Clear History
+                  </button>
+                </div>
+
+                <div class="space-y-4">
+                  ${state.requests.slice(-5).reverse().map(request => `
+                    <div class="border-2 border-gray-200 p-5 hover:border-gray-300 transition-colors">
+                      <div class="flex justify-between items-start mb-3">
+                        <div>
+                          <p class="font-bold text-gray-900 text-lg">${request.name}</p>
+                          <p class="text-sm text-gray-600 mt-1">${request.department} - ${new Date(request.submittedAt).toLocaleDateString('en-US')}</p>
+                        </div>
+                        <span class="px-4 py-1 bg-yellow-100 text-yellow-900 font-bold text-sm uppercase tracking-wide border border-yellow-300">
+                          ${request.status}
+                        </span>
+                      </div>
+                      <div class="mt-4 pt-4 border-t border-gray-200">
+                        <p class="text-sm font-bold text-gray-700 mb-2 uppercase">Items:</p>
+                        <ul class="text-sm text-gray-600 space-y-1">
+                          ${request.items.map(item => `
+                            <li class="flex justify-between">
+                              <span>• ${item.itemName}</span>
+                              <span class="font-semibold">Qty: ${item.quantity}</span>
+                            </li>
+                          `).join('')}
+                        </ul>
+                      </div>
+                    </div>
+                  `).join('')}
+                </div>
+
+                <p class="text-xs text-gray-500 mt-6">
+                  Note: Request history is saved locally in this browser only.
+                </p>
+              </div>
+            </div>
+          ` : ''}
+        </div>
+
+        <!-- Footer -->
+        <div class="corporate-blue text-white py-6 mt-8">
+          <div class="max-w-6xl mx-auto px-4 text-center">
+            <p class="text-sm">Sojitz de Puerto Rico dba Hyundai de Puerto Rico</p>
+            <p class="text-xs text-blue-300 mt-1">© ${new Date().getFullYear()} All rights reserved</p>
+          </div>
+        </div>
+      `;
+
+      // Add event listeners after rendering
+      document.getElementById('name')?.addEventListener('input', (e) => updateFormData('name', e.target.value));
+      document.getElementById('date')?.addEventListener('input', (e) => updateFormData('date', e.target.value)); // ISO stored
+      document.getElementById('department')?.addEventListener('input', (e) => updateFormData('department', e.target.value));
+      document.getElementById('position')?.addEventListener('input', (e) => updateFormData('position', e.target.value));
+      document.getElementById('contactExt')?.addEventListener('input', (e) => updateFormData('contactExt', e.target.value));
+      document.getElementById('email')?.addEventListener('input', (e) => updateFormData('email', e.target.value));
+
+      // Event listeners for items
+      state.requestedItems.forEach(item => {
+        document.getElementById(`item-${item.id}`)?.addEventListener('change', (e) => updateItem(item.id, 'itemId', e.target.value));
+        document.getElementById(`qty-${item.id}`)?.addEventListener('input', (e) => updateItem(item.id, 'quantity', parseInt(e.target.value) || 1));
+      });
+    }
+
+    // Initialize
+    loadRequests();
+    render();
+  </script>
+</body>
+</html>
