@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Office Supply Request - Hyundai</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <style>
+    body{
+      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+      background-color:#f5f5f5;margin:0;padding:0
+    }
+    .hyundai-blue{background-color:#002c5f}
+    .hyundai-blue-text{color:#002c5f}
+    .hyundai-blue-border{border-color:#002c5f}
+    @media print{body{background:white}.no-print{display:none!important}.print-only{display:block!important}}
+  </style>
+</head>
+
+<body class="min-h-screen py-10 px-4">
+  <div id="app"></div>
+
+  <script>
+    // ==========================
+    // SUPPLY CATALOG
+    // ==========================
+    const SUPPLY_CATALOG = [
+      { id: 1,  name: 'Pens (blue)',              category: 'Writing' },
+      { id: 2,  name: 'Pens (black)',             category: 'Writing' },
+      { id: 3,  name: 'Pens (red)',               category: 'Writing' },
+      { id: 4,  name: 'Pencils #2',               category: 'Writing' },
+      { id: 5,  name: 'Permanent markers',        category: 'Writing' },
+      { id: 6,  name: 'Highlighters',             category: 'Writing' },
+      { id: 7,  name: 'Manila folders',           category: 'Filing' },
+      { id: 8,  name: 'Hanging folders',          category: 'Filing' },
+      { id: 9,  name: 'Notebooks (letter size)',  category: 'Paper' },
+      { id: 10, name: 'Notebooks (pocket)',       category: 'Paper' },
+      { id: 11, name: 'Post-it notes',            category: 'Paper' },
+      { id: 12, name: 'Letter paper (ream)',      category: 'Paper' },
+      { id: 13, name: 'Paper clips (box)',        category: 'Fasteners' },
+      { id: 14, name: 'Staples (box)',            category: 'Fasteners' },
+      { id: 15, name: 'Stapler',                  category: 'Fasteners' },
+      { id: 16, name: 'Hole punch',               category: 'Fasteners' },
+      { id: 17, name: 'Tape',                     category: 'Adhesives' },
+      { id: 18, name: 'Glue stick',               category: 'Adhesives' },
+      { id: 19, name: 'Correction fluid',         category: 'Writing' },
+      { id: 20, name: 'Scissors',                 category: 'Tools' },
+    ];
+
+    // ==========================
+    // STATE
+    // ==========================
+    const state = {
+      formData: {
+        name: '',
+        date: '',
+        department: '',
+        position: '',
+        contactExt: '',
+        email: ''
+      },
+      requestedItems: [] // { id, itemId, quantity }
+    };
+
+    // ==========================
+    // HELPERS
+    // ==========================
+    function todayISO() {
+      const d = new Date();
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    }
+
+    function formatDisplayDate(iso) {
+      if (!iso) return '';
+      const [y, m, d] = iso.split('-');
+      return `${m}/${d}/${y}`;
+    }
+
+    function safeFilenamePart(str) {
+      return String(str || '')
+        .trim()
+        .replace(/[\/\\:*?"<>|]/g, '')
+        .replace(/\s+/g, '_')
+        .replace(/_+/g, '_')
+        .slice(0, 60) || 'User';
+    }
+
+    function updateFormData(field, value) {
+      state.formData[field] = value;
+    }
+
+    function getSupplyLabelById(id) {
+      const s = SUPPLY_CATALOG.find(x => String(x.id) === String(id));
+      return s ? `${s.name}` : '';
+    }
+
+    // Silent clear (no confirm) – used after submit
+    function clearFormSilent() {
+      state.formData = { name: '', date: '', department: '', position: '', contactExt: '', email: '' };
+      state.requestedItems = [];
+      state.formData.date = todayISO();
+      render();
+    }
+
+    // ==========================
+    // RENDER
+    // ==========================
+    function render() {
+      const app = document.getElementById('app');
+
+      app.innerHTML = `
+        <div class="max-w-5xl mx-auto bg-white shadow-2xl rounded-lg overflow-hidden">
+          <!-- Header -->
+          <div class="hyundai-blue p-6">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center space-x-4">
+                <div class="w-14 h-14 bg-white rounded-full flex items-center justify-center">
+                  <span class="hyundai-blue-text font-black text-xl">H</span>
+                </div>
+                <div>
+                  <h1 class="text-2xl md:text-3xl font-extrabold text-white tracking-wide">OFFICE SUPPLY REQUEST</h1>
+                  <p class="text-blue-100 text-sm mt-1">Sojitz de Puerto Rico</p>
+                </div>
+              </div>
+              <!-- Request Date removed -->
+            </div>
+          </div>
+
+          <!-- Content -->
+          <div class="p-6 md:p-8">
+            <!-- REQUESTER INFORMATION -->
+            <div class="mb-8">
+              <h2 class="text-lg font-extrabold hyundai-blue-text uppercase tracking-wider mb-4 border-b pb-2">
+                Requester Information
+              </h2>
+
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label for="name" class="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-wide">Full Name *</label>
+                  <input type="text" id="name" required value="${state.formData.name}"
+                    class="w-full px-4 py-3 border-2 border-gray-300 focus:border-blue-900 focus:outline-none transition-colors"
+                    placeholder="John Doe">
+                </div>
+
+                <div>
+                  <label for="date" class="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-wide">Date</label>
+                  <input type="date" id="date"
+                    value="${todayISO()}" min="${todayISO()}" max="${todayISO()}" readonly
+                    class="w-full px-4 py-3 border-2 border-gray-300 focus:border-blue-900 focus:outline-none transition-colors bg-gray-50 cursor-not-allowed">
+                </div>
+
+                <div>
+                  <label for="department" class="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-wide">Department *</label>
+                  <select id="department" required
+                    class="w-full px-4 py-3 border-2 border-gray-300 focus:border-blue-900 focus:outline-none transition-colors">
+                    <option value="">Select a department...</option>
+                    <option value="Human Resources" ${state.formData.department === 'Human Resources' ? 'selected' : ''}>Human Resources</option>
+                    <option value="Information Technology" ${state.formData.department === 'Information Technology' ? 'selected' : ''}>Information Technology</option>
+                    <option value="Services" ${state.formData.department === 'Services' ? 'selected' : ''}>Services</option>
+                    <option value="Parts" ${state.formData.department === 'Parts' ? 'selected' : ''}>Parts</option>
+                    <option value="Dealer Development" ${state.formData.department === 'Dealer Development' ? 'selected' : ''}>Dealer Development</option>
+                    <option value="Administration" ${state.formData.department === 'Administration' ? 'selected' : ''}>Administration</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label for="position" class="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-wide">Position *</label>
+                  <input type="text" id="position" required value="${state.formData.position}"
+                    class="w-full px-4 py-3 border-2 border-gray-300 focus:border-blue-900 focus:outline-none transition-colors"
+                    placeholder="e.g., Analyst">
+                </div>
+
+                <div>
+                  <label for="contactExt" class="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-wide">Extension</label>
+                  <input type="text" id="contactExt" value="${state.formData.contactExt}"
+                    inputmode="numeric" pattern="\\d{4}" minlength="4" maxlength="4"
+                    class="w-full px-4 py-3 border-2 border-gray-300 focus:border-blue-900 focus:outline-none transition-colors"
+                    placeholder="e.g. 1234" title="Extension must be 4 digits (e.g., 1234)">
+                </div>
+
+                <div>
+                  <label for="email" class="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-wide">Email *</label>
+                  <input type="email" id="email" required value="${state.formData.email}"
+                    class="w-full px-4 py-3 border-2 border-gray-300 focus:border-blue-900 focus:outline-none transition-colors"
+                    placeholder="johndoe@hyundaipr.com">
+                </div>
+              </div>
+            </div>
+
+            <!-- SUPPLY REQUEST -->
+            <div class="mb-8">
+              <div class="flex items-center justify-between mb-4 border-b pb-2">
+                <h2 class="text-lg font-extrabold hyundai-blue-text uppercase tracking-wider">Supply Request</h2>
+                <button id="addItemBtn" type="button"
+                  class="hyundai-blue text-white px-5 py-2 rounded-lg font-bold tracking-wide hover:opacity-90 transition-opacity">
+                  + Add Item
+                </button>
+              </div>
+
+              <div class="overflow-x-auto">
+                ${
+                  state.requestedItems.length === 0
+                    ? `<div class="text-center py-10 bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg">
+                         <p class="text-gray-500 font-medium">No items in your request. Click "Add Item" to begin.</p>
+                       </div>`
+                    : `
+                      <table class="w-full border-collapse">
+                        <thead>
+                          <tr class="bg-gray-50 border-b-2 border-gray-300">
+                            <th class="text-left py-3 px-4 font-bold text-gray-700 uppercase text-sm">Item Description</th>
+                            <th class="text-center py-3 px-4 font-bold text-gray-700 uppercase text-sm w-32">Quantity</th>
+                            <th class="w-20"></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          ${state.requestedItems.map((item) => `
+                            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                              <td class="py-3 px-4">
+                                <select id="item-${item.id}" class="w-full px-3 py-2 border-2 border-gray-300 focus:border-blue-900 focus:outline-none transition-colors" required>
+                                  <option value="">Select an item.</option>
+                                  ${SUPPLY_CATALOG.map(supply => `
+                                    <option value="${supply.id}" ${String(item.itemId) === String(supply.id) ? 'selected' : ''}>
+                                      ${supply.name} (${supply.category})
+                                    </option>
+                                  `).join('')}
+                                </select>
+                              </td>
+                              <td class="py-3 px-4">
+                                <input type="number" min="1" step="1" value="${item.quantity}" id="qty-${item.id}"
+                                  class="w-full px-3 py-2 border-2 border-gray-300 focus:border-blue-900 focus:outline-none transition-colors text-center">
+                              </td>
+                              <td class="py-3 px-4 text-center">
+                                <button type="button" class="removeBtn px-3 py-2 text-red-700 font-bold hover:bg-red-50 rounded transition-colors" data-id="${item.id}">
+                                  Remove
+                                </button>
+                              </td>
+                            </tr>
+                          `).join('')}
+                        </tbody>
+                      </table>
+                    `
+                }
+              </div>
+            </div>
+
+            <!-- Buttons -->
+            <div class="flex flex-col md:flex-row gap-4 justify-end no-print">
+              <button id="clearBtn" type="button"
+                class="px-6 py-3 rounded-lg font-bold tracking-wide border-2 border-gray-300 hover:border-gray-400 transition-colors">
+                Clear Form
+              </button>
+
+              <button id="submitBtn" type="button"
+                class="hyundai-blue text-white px-8 py-3 rounded-lg font-extrabold tracking-wide hover:opacity-90 transition-opacity">
+                Submit Request
+              </button>
+            </div>
+          </div>
+
+          <!-- Footer -->
+          <div class="p-4 bg-gray-100 text-center text-xs text-gray-600">
+            For internal use only • Sojitz de Puerto Rico • Generated on ${formatDisplayDate(todayISO())}
+          </div>
+        </div>
+      `;
+
+      // ==========================
+      // EVENTS
+      // ==========================
+      document.getElementById('name')?.addEventListener('input', (e) => updateFormData('name', e.target.value));
+      document.getElementById('department')?.addEventListener('change', (e) => updateFormData('department', e.target.value));
+      document.getElementById('position')?.addEventListener('input', (e) => updateFormData('position', e.target.value));
+      document.getElementById('email')?.addEventListener('input', (e) => updateFormData('email', e.target.value));
+
+      // Extension: numeric only, max 4
+      document.getElementById('contactExt')?.addEventListener('input', (e) => {
+        const digitsOnly = String(e.target.value || '').replace(/\D/g, '').slice(0, 4);
+        e.target.value = digitsOnly;
+        updateFormData('contactExt', digitsOnly);
+      });
+
+      document.getElementById('addItemBtn')?.addEventListener('click', addItemRow);
+      document.getElementById('clearBtn')?.addEventListener('click', handleClearForm);
+      document.getElementById('submitBtn')?.addEventListener('click', handleSubmit);
+
+      // Wire per-row events
+      state.requestedItems.forEach((it) => {
+        const sel = document.getElementById(`item-${it.id}`);
+        const qty = document.getElementById(`qty-${it.id}`);
+
+        sel?.addEventListener('change', (e) => {
+          const row = state.requestedItems.find(x => x.id === it.id);
+          if (row) row.itemId = e.target.value;
+        });
+
+        qty?.addEventListener('input', (e) => {
+          const row = state.requestedItems.find(x => x.id === it.id);
+          if (row) row.quantity = e.target.value;
+        });
+      });
+
+      document.querySelectorAll('.removeBtn')?.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const id = Number(e.target.getAttribute('data-id'));
+          removeItem(id);
+        });
+      });
+    }
+
+    // ==========================
+    // ITEMS
+    // ==========================
+    function addItemRow() {
+      state.requestedItems.push({
+        id: Date.now() + Math.floor(Math.random() * 1000),
+        itemId: '',
+        quantity: 1
+      });
+      render();
+    }
+
+    function removeItem(id) {
+      state.requestedItems = state.requestedItems.filter(x => x.id !== id);
+      render();
+    }
+
+    // ==========================
+    // CLEAR (manual)
+    // ==========================
+    function handleClearForm() {
+      if (!confirm('Clear the form?')) return;
+      clearFormSilent();
+    }
+
+    // ==========================
+    // PDF (FORM STYLE 1:1)
+    // ==========================
+    function generateAndDownloadPDF() {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF({ unit: 'mm', format: 'letter' }); // 216 x 279 mm
+
+      // Page metrics
+      const pageW = doc.internal.pageSize.getWidth();
+      const pageH = doc.internal.pageSize.getHeight();
+      const margin = 14;
+
+      const iso = todayISO();
+      const dateStr = formatDisplayDate(iso);
+
+      // Title
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(20);
+      doc.text('OFFICE SUPPLIES REQUISITION FORM', pageW / 2, 18, { align: 'center' });
+
+      // REQUESTER INFORMATION
+      let y = 30;
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.text('REQUESTER INFORMATION', margin, y);
+
+      y += 8;
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+
+      // Name / Date
+      doc.text(`Name: ${state.formData.name || ''}`, margin, y);
+      doc.text(`Date: ${dateStr}`, pageW / 2, y);
+
+      // Department / Position
+      y += 7;
+      doc.text(`Department: ${state.formData.department || ''}`, margin, y);
+      doc.text(`Position: ${state.formData.position || ''}`, pageW / 2, y);
+
+      // Extension / Email
+      y += 7;
+      doc.text(`Extension: ${state.formData.contactExt || ''}`, margin, y);
+      doc.text(`Email: ${state.formData.email || ''}`, pageW / 2, y);
+
+      // REQUESTED ITEMS
+      y += 12;
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(11);
+      doc.text('REQUESTED ITEMS', margin, y);
+
+      // Table setup
+      y += 6;
+      const tableX = margin;
+      const tableW = pageW - margin * 2;
+      const qtyColW = 35;
+      const descColW = tableW - qtyColW;
+
+      const headerH = 8;
+      const rowH = 8;
+
+      // Header row
+      doc.setDrawColor(0);
+      doc.setLineWidth(0.2);
+
+      // Header rect
+      doc.rect(tableX, y, tableW, headerH);
+      // Column split
+      doc.line(tableX + descColW, y, tableX + descColW, y + headerH);
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.text('Item Description', tableX + 2, y + 5.6);
+      doc.text('Quantity', tableX + descColW + qtyColW / 2, y + 5.6, { align: 'center' });
+
+      // Rows
+      doc.setFont('helvetica', 'normal');
+      let rowsY = y + headerH;
+
+      const rows = state.requestedItems.map((it, idx) => ({
+        n: idx + 1,
+        desc: getSupplyLabelById(it.itemId),
+        qty: String(it.quantity || '')
+      }));
+
+      if (rows.length === 0) {
+        // at least one empty row to match form style
+        doc.rect(tableX, rowsY, tableW, rowH);
+        doc.line(tableX + descColW, rowsY, tableX + descColW, rowsY + rowH);
+      } else {
+        rows.forEach((r) => {
+          // Page break handling (simple): if close to bottom, add new page and re-draw table header
+          if (rowsY + rowH + 60 > pageH) {
+            doc.addPage();
+            y = 18;
+
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(14);
+            doc.text('OFFICE SUPPLIES REQUISITION FORM', pageW / 2, y, { align: 'center' });
+
+            y = 30;
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(11);
+            doc.text('REQUESTED ITEMS', margin, y);
+
+            y += 6;
+            doc.rect(tableX, y, tableW, headerH);
+            doc.line(tableX + descColW, y, tableX + descColW, y + headerH);
+
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(10);
+            doc.text('Item Description', tableX + 2, y + 5.6);
+            doc.text('Quantity', tableX + descColW + qtyColW / 2, y + 5.6, { align: 'center' });
+
+            doc.setFont('helvetica', 'normal');
+            rowsY = y + headerH;
+          }
+
+          doc.rect(tableX, rowsY, tableW, rowH);
+          doc.line(tableX + descColW, rowsY, tableX + descColW, rowsY + rowH);
+
+          const itemText = `${r.n}. ${r.desc}`;
+          doc.text(itemText, tableX + 2, rowsY + 5.6);
+          doc.text(r.qty, tableX + descColW + qtyColW / 2, rowsY + 5.6, { align: 'center' });
+
+          rowsY += rowH;
+        });
+      }
+
+      // FOR ADMINISTRATION USE ONLY
+      let adminY = rowsY + 12;
+      if (adminY + 35 > pageH - 15) {
+        doc.addPage();
+        adminY = 30;
+      }
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(11);
+      doc.text('FOR ADMINISTRATION USE ONLY', margin, adminY);
+
+      adminY += 9;
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+
+      doc.text('AVP Approval: _______________________   Date: _______________', margin, adminY);
+      adminY += 9;
+      doc.text('Processed By: _______________________   Completion Date: _______________', margin, adminY);
+
+      // Footer
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.text('Sojitz de Puerto Rico dba Hyundai de Puerto Rico', pageW / 2, pageH - 12, { align: 'center' });
+
+      const filename = `Supply_Request_${safeFilenamePart(state.formData.name)}_${iso}.pdf`;
+      doc.save(filename);
+    }
+
+    // ==========================
+    // SUBMIT (downloads PDF automatically + clears form)
+    // ==========================
+    function handleSubmit() {
+      const nameEl = document.getElementById('name');
+      const deptEl = document.getElementById('department');
+      const posEl  = document.getElementById('position');
+      const emailEl= document.getElementById('email');
+
+      // Native validation
+      if (![nameEl, deptEl, posEl, emailEl].every(el => el && el.checkValidity())) {
+        const firstInvalid = [nameEl, deptEl, posEl, emailEl].find(el => el && !el.checkValidity());
+        firstInvalid?.reportValidity();
+        return;
+      }
+
+      // Date ALWAYS today
+      state.formData.date = todayISO();
+
+      // Validate items
+      if (state.requestedItems.length === 0) {
+        alert('Please add at least one item to your request.');
+        return;
+      }
+
+      // Ensure all rows have item selected and valid qty
+      const badRow = state.requestedItems.find(it => !it.itemId || !it.quantity || Number(it.quantity) < 1);
+      if (badRow) {
+        alert('Please select an item and enter a valid quantity for each line.');
+        return;
+      }
+
+      // 1) Auto-download PDF (1:1 form style)
+      generateAndDownloadPDF();
+
+      // 2) Email content (kept as-is for now)
+      const subject = encodeURIComponent(`Office Supply Request Submitted`);
+      const bodyLines = [
+        `Dear Administration,`,
+        ``,
+        `I hope you are doing well. A new office supply request has been submitted.`,
+        ``,
+        `REQUESTER INFORMATION:`,
+        `Name: ${state.formData.name}`,
+        `Date: ${formatDisplayDate(state.formData.date)}`,
+        ``,
+        `REQUESTED ITEMS:`,
+        ...state.requestedItems.map((it, idx) => `${idx + 1}. ${getSupplyLabelById(it.itemId)} - Quantity: ${it.quantity}`),
+        ``,
+        `I've attached the detailed PDF to this email.`,
+        `Best regards,`,
+        `Office Supply System`
+      ];
+
+      const body = encodeURIComponent(bodyLines.join('\n'));
+
+      // Change recipient as needed
+      const recipient = 'hr@hyundaipr.com';
+      window.location.href = `mailto:${recipient}?subject=${subject}&body=${body}`;
+
+      // 3) Auto clear after submit
+      setTimeout(() => {
+        clearFormSilent();
+      }, 350);
+    }
+
+    // ==========================
+    // INIT
+    // ==========================
+    state.formData.date = todayISO();
+    render();
+  </script>
+</body>
+</html>
