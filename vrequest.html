@@ -1,0 +1,426 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Vacation Request Form - Hyundai</title>
+
+  <!-- ✅ Tailwind CSS (CDN correcto) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- ✅ jsPDF (CDN correcto) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+  <style>
+    body{
+      background-color:#f3f4f6; /* fondo gris claro */
+      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+    }
+    .brand-blue{ background-color:#002c5f; }
+    .brand-text{ color:#002c5f; }
+  </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-6">
+  <!-- CARD -->
+  <form id="vacationForm" class="w-full max-w-5xl bg-white rounded-xl shadow-lg overflow-hidden" novalidate>
+    <!-- HEADER -->
+    <div class="brand-blue px-8 py-6">
+      <h1 class="text-2xl font-bold text-white tracking-wide">VACATION REQUEST FORM</h1>
+      <p class="text-blue-200 text-sm mt-1">Sojitz de Puerto Rico dba Hyundai de Puerto Rico</p>
+    </div>
+
+    <!-- CONTENT -->
+    <div class="p-8 space-y-10">
+      <!-- EMPLOYEE INFORMATION -->
+      <section>
+        <h2 class="font-semibold text-sm uppercase brand-text mb-6">Requester Information</h2>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label for="employeeName" class="block text-xs font-semibold mb-1">Full Name *</label>
+            <input id="employeeName" name="employeeName" type="text" required autocomplete="name"
+                   class="w-full border rounded-md px-4 py-3 focus:outline-none focus:ring-1 focus:ring-blue-800"/>
+          </div>
+
+          <div>
+            <label for="jobTitle" class="block text-xs font-semibold mb-1">Position *</label>
+            <input id="jobTitle" name="jobTitle" type="text" required autocomplete="organization-title"
+                   class="w-full border rounded-md px-4 py-3 focus:outline-none focus:ring-1 focus:ring-blue-800"/>
+          </div>
+
+          <div>
+            <label for="employeeNumber" class="block text-xs font-semibold mb-1">Employee Number *</label>
+            <!-- 🔧 Arreglo mínimo: pattern correcto a ^[0-9]+$ -->
+            <input id="employeeNumber" name="employeeNumber" type="text" required
+                   inputmode="numeric" pattern="^[0-9]+$"
+                   autocomplete="off" class="w-full border rounded-md px-4 py-3" placeholder="e.g. 12345"/>
+          </div>
+
+          <div>
+            <label for="department" class="block text-xs font-semibold mb-1">Department *</label>
+            <input id="department" name="department" type="text" required
+                   class="w-full border rounded-md px-4 py-3"/>
+          </div>
+
+          <div>
+            <label for="classification" class="block text-xs font-semibold mb-1">Classification *</label>
+            <select id="classification" name="classification" required class="w-full border rounded-md px-4 py-3">
+              <option value="">Select...</option>
+              <option>Non-Exempt</option>
+              <option>Exempt</option>
+            </select>
+          </div>
+
+          <div>
+            <label for="hiredDate" class="block text-xs font-semibold mb-1">Hired Date</label>
+            <input id="hiredDate" name="hiredDate" type="date" class="w-full border rounded-md px-4 py-3"/>
+          </div>
+        </div>
+      </section>
+
+      <!-- VACATION PERIOD -->
+      <section>
+        <h2 class="font-semibold text-sm uppercase brand-text mb-6">Vacation Period Requested</h2>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+          <div>
+            <label for="fromDate" class="block text-xs font-semibold mb-1">From *</label>
+            <input id="fromDate" name="fromDate" type="date" required class="w-full border rounded-md px-4 py-3"/>
+          </div>
+
+          <div>
+            <label for="toDate" class="block text-xs font-semibold mb-1">To *</label>
+            <input id="toDate" name="toDate" type="date" required class="w-full border rounded-md px-4 py-3"/>
+          </div>
+
+          <div>
+            <label for="returnOn" class="block text-xs font-semibold mb-1">Return On *</label>
+            <input id="returnOn" name="returnOn" type="date" required class="w-full border rounded-md px-4 py-3"/>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div>
+            <label for="includedInPlanning" class="block text-xs font-semibold mb-1">Included in Planning *</label>
+            <select id="includedInPlanning" name="includedInPlanning" required class="w-full border rounded-md px-4 py-3">
+              <option value="">Select...</option>
+              <option>Yes</option>
+              <option>No</option>
+            </select>
+          </div>
+
+          <div>
+            <label for="totalDays" class="block text-xs font-semibold mb-1">Total Days *</label>
+            <input id="totalDays" name="totalDays" type="number" min="0" step="1" required
+                   class="w-full border rounded-md px-4 py-3" placeholder="0"/>
+          </div>
+
+          <div>
+            <label for="totalHours" class="block text-xs font-semibold mb-1">Total Hours</label>
+            <input id="totalHours" name="totalHours" type="text" readonly
+                   class="w-full border rounded-md px-4 py-3 bg-gray-100" placeholder="0"/>
+          </div>
+        </div>
+      </section>
+
+      <!-- COMMENTS (VISIBLE) -->
+      <section>
+        <h2 class="font-semibold text-sm uppercase brand-text mb-4">Comments</h2>
+        <textarea id="comments" name="comments" rows="4"
+                  class="w-full border rounded-md px-4 py-3 focus:outline-none"></textarea>
+      </section>
+
+      <!-- EMAIL (MANDATORY) -->
+      <section>
+        <h2 class="font-semibold text-sm uppercase brand-text mb-2">Email (Required)</h2>
+        <p class="text-sm text-gray-500 mb-3">
+          This request will be sent to the email address entered below.
+        </p>
+        <input id="sendToEmail" name="sendToEmail" type="email" required autocomplete="email"
+               placeholder="hr@hyundaipr.com" class="w-full border rounded-md px-4 py-3"/>
+      </section>
+
+      <!-- ACTIONS -->
+      <div class="flex justify-end gap-4 pt-6 border-t">
+        <button type="reset" class="px-6 py-3 border rounded-md text-sm font-semibold hover:bg-gray-50">
+          Clear Form
+        </button>
+        <button id="submitBtn" type="submit" class="px-8 py-3 bg-blue-900 text-white rounded-md text-sm font-semibold hover:bg-blue-800">
+          Submit Request
+        </button>
+      </div>
+    </div>
+
+    <!-- FOOTER -->
+    <div class="bg-gray-50 text-center text-xs text-gray-500 py-4">
+      For internal use only • Sojitz de Puerto Rico • Generated automatically
+    </div>
+  </form>
+
+  <script>
+    // ==========================
+    // CONSTANTS & ELEMENTS
+    // ==========================
+    const WORKDAY_HOURS = 7.5;
+
+    const form = document.getElementById('vacationForm');
+    const employeeName = document.getElementById('employeeName');
+    const jobTitle = document.getElementById('jobTitle');
+    const employeeNumber = document.getElementById('employeeNumber');
+    const department = document.getElementById('department');
+    const classification = document.getElementById('classification');
+    const hiredDate = document.getElementById('hiredDate');
+
+    const fromEl = document.getElementById('fromDate');
+    const toEl = document.getElementById('toDate');
+    const returnEl = document.getElementById('returnOn');
+    const includedPlan = document.getElementById('includedInPlanning');
+    const totalDaysEl = document.getElementById('totalDays');
+    const totalHoursEl = document.getElementById('totalHours');
+
+    const commentsEl = document.getElementById('comments');
+    const emailEl = document.getElementById('sendToEmail');
+
+    // ==========================
+    // HELPERS
+    // ==========================
+    function normalizeNumberString(n) {
+      if (typeof n !== 'number' || !isFinite(n)) return '';
+      return n.toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1');
+    }
+    function recalcHours() {
+      const days = parseInt(totalDaysEl.value || '0', 10);
+      totalHoursEl.value = Number.isFinite(days) && days >= 0
+        ? normalizeNumberString(days * WORKDAY_HOURS)
+        : '';
+    }
+    function clearCustomValidity(el){ el.setCustomValidity(''); }
+    function setError(el, msg){ el.setCustomValidity(msg); el.reportValidity(); el.focus(); }
+
+    function formatDateDisplay(iso) {
+      if (!iso) return '';
+      const [y,m,d] = iso.split('-').map(Number);
+      const dt = new Date(y, m-1, d);
+      return isNaN(dt) ? '' : dt.toLocaleDateString('en-US');
+    }
+    // Utilidad para MAYÚSCULAS (para el contenido del email)
+    function up(v) { return String(v ?? '').toUpperCase(); }
+
+    // ==========================
+    // UI BEHAVIOR
+    // ==========================
+    totalDaysEl.addEventListener('input', recalcHours);
+
+    // Employee Number: only digits (filtro en vivo)
+    employeeNumber.addEventListener('input', () => {
+      const clean = employeeNumber.value.replace(/\D+/g,'');
+      if (clean !== employeeNumber.value) employeeNumber.value = clean;
+    });
+
+    // Date logic validation with visible messages
+    function validateDateLogic(){
+      clearCustomValidity(fromEl); clearCustomValidity(toEl); clearCustomValidity(returnEl);
+      const f = fromEl.value, t = toEl.value, r = returnEl.value;
+
+      if (f && t && t < f) {
+        setError(toEl, "'To' date cannot be earlier than the 'From' date.");
+        return false;
+      }
+      if (f && r && r < f) {
+        setError(returnEl, "'Return On' date cannot be earlier than the 'From' date.");
+        return false;
+      }
+      return true;
+    }
+    fromEl.addEventListener('change', validateDateLogic);
+    toEl.addEventListener('change', validateDateLogic);
+    returnEl.addEventListener('change', validateDateLogic);
+
+    // ==========================
+    // PDF GENERATION (late-binding jsPDF)
+    // ==========================
+    function generatePDF() {
+      const ns = window.jspdf;
+      if (!ns || !ns.jsPDF) {
+        console.warn('jsPDF not loaded; skipping PDF generation.');
+        return null;
+      }
+      const { jsPDF } = ns;
+      const doc = new jsPDF();
+      let y = 18;
+
+      doc.setFontSize(16); doc.setFont(undefined,'bold');
+      doc.text('VACATION REQUEST FORM', 105, y, { align:'center' }); y += 6;
+      doc.setFontSize(9); doc.setFont(undefined,'normal');
+      doc.text('Sojitz de Puerto Rico dba Hyundai de Puerto Rico', 105, y, { align:'center' }); y += 6;
+
+      doc.setLineWidth(0.4); doc.line(15, y, 195, y); y += 8;
+
+      // EMPLOYEE INFORMATION
+      doc.setFont(undefined,'bold'); doc.setFontSize(11);
+      doc.text('EMPLOYEE INFORMATION', 15, y); y += 7;
+      doc.setFont(undefined,'normal'); doc.setFontSize(10);
+      doc.text(`Employee's Name: ${employeeName.value}`, 15, y);
+      doc.text(`Job Title: ${jobTitle.value}`, 110, y); y += 6;
+      doc.text(`Employee Number: ${employeeNumber.value}`, 15, y);
+      doc.text(`Department: ${department.value}`, 110, y); y += 6;
+      doc.text(`Classification: ${classification.value}`, 15, y);
+      doc.text(`Hired Date: ${formatDateDisplay(hiredDate.value)}`, 110, y); y += 8;
+
+      doc.line(15, y, 195, y); y += 8;
+
+      // VACATION PERIOD REQUESTED
+      doc.setFont(undefined,'bold'); doc.setFontSize(11);
+      doc.text('VACATION PERIOD REQUESTED', 15, y); y += 7;
+      doc.setFont(undefined,'normal'); doc.setFontSize(10);
+      doc.text(`From: ${formatDateDisplay(fromEl.value)}`, 15, y);
+      doc.text(`To: ${formatDateDisplay(toEl.value)}`, 70, y);
+      doc.text(`Return on: ${formatDateDisplay(returnEl.value)}`, 125, y); y += 6;
+      doc.text(`Included in Vacation Planning: ${includedPlan.value}`, 15, y);
+      doc.text(`Total Hours: ${totalHoursEl.value || '—'}`, 125, y);
+      doc.text(`Total Days: ${totalDaysEl.value || '—'}`, 165, y); y += 8;
+
+      doc.line(15, y, 195, y); y += 8;
+
+      // PERSONAL WITH PAY (placeholder)
+      doc.setFont(undefined,'bold'); doc.setFontSize(11);
+      doc.text('PERSONAL WITH PAY', 15, y); y += 7;
+      doc.setFont(undefined,'normal'); doc.setFontSize(10);
+      doc.text(`Yes: No`, 15, y);
+      doc.text(`Date of Birth: —`, 70, y); y += 8;
+
+      // TYPE (placeholder)
+      doc.setFont(undefined,'bold'); doc.setFontSize(11);
+      doc.text('TYPE', 15, y); y += 7;
+      doc.setFont(undefined,'normal'); doc.setFontSize(10);
+      doc.text(`To be: To be Enjoyed`, 15, y); y += 6;
+      doc.text(`Reason: —`, 15, y); y += 8;
+
+      doc.line(15, y, 195, y); y += 8;
+
+      // SIGNATURE
+      doc.setFont(undefined, 'bold'); doc.setFontSize(11);
+      doc.text('EMPLOYEE SIGNATURE', 15, y); y += 7;
+      doc.setFont(undefined,'normal'); doc.setFontSize(10);
+      doc.text('Signature (typed):', 15, y); doc.line(55, y, 140, y);
+      doc.text('Date:', 150, y); doc.line(162, y, 195, y); y += 10;
+
+      doc.line(15, y, 195, y); y += 8;
+
+      // APPROVALS (IF APPLICABLE) – en PDF
+      doc.setFont(undefined, 'bold'); doc.setFontSize(11);
+      doc.text('APPROVALS (IF APPLICABLE)', 15, y); y += 7;
+      doc.setFont(undefined,'normal'); doc.setFontSize(10);
+      [
+        'Assistant Manager / Immediate Manager',
+        'AVP or Director',
+        'Department Manager',
+        'Vice President & CFO / VP & COO',
+        'AVP – Human Resources & Administration',
+        'President & CEO',
+      ].forEach(label => {
+        doc.text(label + ':', 15, y); doc.line(92, y, 140, y);
+        doc.text('Date:', 150, y); doc.line(162, y, 195, y);
+        y += 6;
+      });
+      y += 6; doc.line(15, y, 195, y); y += 8;
+
+      // COMMENTS
+      doc.setFont(undefined,'bold'); doc.setFontSize(11);
+      doc.text('COMMENTS', 15, y); y += 7;
+      doc.setFont(undefined,'normal'); doc.setFontSize(10);
+      const c = String(commentsEl.value || '').trim();
+      if (c) {
+        const lines = doc.splitTextToSize(c, 175);
+        lines.slice(0,2).forEach(line => { doc.text(line, 15, y); y += 5; });
+      }
+      doc.line(15, y, 195, y); y += 7; doc.line(15, y, 195, y); y += 9;
+      doc.line(15, y, 195, y); y += 8;
+
+      // FOR OFFICIAL USE ONLY
+      doc.setFont(undefined,'bold'); doc.setFontSize(11);
+      doc.text('FOR OFFICIAL USE ONLY', 15, y); y += 7;
+      doc.setFont(undefined,'normal'); doc.setFontSize(10);
+      doc.text('Accrued Vacations as of:', 15, y); doc.line(70, y, 195, y); y += 6;
+      doc.text('Hours:', 15, y); doc.line(30, y, 70, y);
+      doc.text('Days:', 80, y);  doc.line(95, y, 135, y); y += 6;
+      doc.text('Processed by:', 15, y); doc.line(50, y, 120, y);
+      doc.text('Date:', 130, y); doc.line(145, y, 195, y); y += 12;
+
+      doc.setFontSize(8); doc.setTextColor(100);
+      doc.text('Sojitz de Puerto Rico dba Hyundai de Puerto Rico', 105, y, { align:'center' });
+
+      const safeName = String(employeeName.value || 'USER')
+        .replace(/[\/\\:*?"<>|]/g,'')
+        .replace(/\s+/g,'_')
+        .toUpperCase();
+      const pdfName = `Vacation_Request_${safeName}_${Date.now()}.pdf`;
+      doc.save(pdfName);
+      return pdfName;
+    }
+
+    // ==========================
+    // EMAIL LAUNCH (mailto) — SOLO CON NAME, TODO EN MAYÚSCULAS EXCEPTO EL EMAIL
+    // ==========================
+    function openEmail() {
+      // El destinatario se usa tal cual lo escribe el usuario (sin upper)
+      const to = (emailEl.value || '').trim();
+      if (!to) return false; // por si acaso (igual es required)
+
+      // Subject en MAYÚSCULAS
+      const subject = `VACATION REQUEST - ${up(employeeName.value)} - ${up(formatDateDisplay(fromEl.value))} TO ${up(formatDateDisplay(toEl.value))}`;
+
+      // Body EXACTO con solo NAME en mayúsculas
+      const body =
+`Dear Administration,
+I hope you are doing well. A new vacation request has been submitted.
+
+EMPLOYEE INFORMATION:
+Name: ${up(employeeName.value)}
+
+Additional details and approvals are included in the attached PDF.
+
+Best regards,
+Vacation Request System`;
+
+      const mailto = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      const w = window.open(mailto, '_blank');
+      return !!w;
+    }
+
+    // ==========================
+    // SUBMIT FLOW
+    // ==========================
+    form.addEventListener('submit', (e) => {
+      e.preventDefault(); // controlamos el flujo
+
+      // Limpiar mensajes previos
+      [emailEl, employeeNumber, totalDaysEl, fromEl, toEl, returnEl].forEach(clearCustomValidity);
+
+      // 1) Validación nativa (required/type/pattern)
+      if (!form.checkValidity()) {
+        const firstInvalid = form.querySelector(':invalid');
+        if (firstInvalid) firstInvalid.reportValidity();
+        return;
+      }
+      // 2) Reglas de fecha con mensajes visibles
+      if (!validateDateLogic()) return;
+
+      // 3) Cálculo por seguridad y PDF
+      recalcHours();
+      generatePDF();
+
+      // 4) Intentar abrir email
+      const opened = openEmail();
+      if (!opened) {
+        const bar = document.createElement('div');
+        bar.className = 'fixed bottom-4 left-1/2 -translate-x-1/2 bg-white border shadow px-4 py-3 rounded text-sm';
+        bar.textContent = 'Email didn’t open (popup blocked or configuration). Please open your email client and attach the downloaded PDF.';
+        document.body.appendChild(bar);
+        setTimeout(() => bar.remove(), 7000);
+      }
+    });
+  </script>
+</body>
+</

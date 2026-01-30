@@ -1,0 +1,1010 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Employee Record</title>
+
+  <!-- Tailwind + jsPDF -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+  <style>
+    body{
+      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+      background-color:#f5f5f5;margin:0;padding:0
+    }
+    .hyundai-blue{background-color:#002c5f}
+    .hyundai-blue-text{color:#002c5f}
+    .hyundai-blue-border{border-color:#002c5f}
+    @media print{body{background:white}.no-print{display:none!important}.print-only{display:block!important}}
+  </style>
+</head>
+
+<body class="min-h-screen py-10 px-4">
+  <div id="app"></div>
+
+  <script>
+    // ==========================================================
+    // CONFIG (change per company: logo + companyName)
+    // ==========================================================
+    const COMPANY = {
+      companyName: 'Sojitz de Puerto Rico',
+      logoUrl: '' // e.g. 'https://tenant.sharepoint.com/sites/site/SiteAssets/logo.png'
+    };
+
+    // ==========================================================
+    // OPTIONS
+    // ==========================================================
+    const DEPARTMENTS = [
+      'Human Resources',
+      'Information Technology',
+      'Administration',
+      'Finance',
+      'Sales',
+      'Service',
+      'Parts',
+      'Dealer Development',
+      'Marketing',
+      'Other'
+    ];
+
+    const LOCATIONS = [
+      { id: 'adm_1', label: 'Adm. Building - 1st Floor' },
+      { id: 'adm_2', label: 'Adm. Building - 2nd Floor' },
+      { id: 'warehouse', label: 'Warehouse' },
+      { id: 'parts_services', label: 'Parts & Services Offices' },
+      { id: 'lot_offices', label: 'Lot Offices' },
+      { id: 'services_offices', label: 'Services Offices' }
+    ];
+
+    // ==========================================================
+    // STATE
+    // ==========================================================
+    const state = {
+      formType: 'New', // New | Update
+      formData: {
+        employeeName: '',
+        startDate: '',
+        endDate: '',
+        department: '',
+        position: '',
+        reportsTo: '',
+
+        equipment: {
+          computerType: '', // 'Desktop' | 'Laptop' | ''
+          phone: false
+        },
+
+        phone: {
+          extension: '',
+          cellular: ''
+        },
+
+        access: {
+          windowsCode: '',
+          outlookAddress: '',
+          sapUser: ''
+        },
+
+        location: {
+          selectedId: '',
+          officeNumber: '',
+          other: ''
+        },
+
+        comments: '',
+
+        signatures: {
+          requestedByName: '',
+          requestedBySignature: '',
+          requestedByDate: ''
+        }
+      }
+    };
+
+    // ==========================================================
+    // HELPERS
+    // ==========================================================
+    function todayISO() {
+      const d = new Date();
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    }
+
+    function formatDisplayDate(iso) {
+      if (!iso) return '';
+      const [y, m, d] = iso.split('-');
+      return `${m}/${d}/${y}`;
+    }
+
+    function safeFilenamePart(str) {
+      return String(str || '')
+        .trim()
+        .replace(/[\/\\:*?"<>|]/g, '')
+        .replace(/\s+/g, '_')
+        .replace(/_+/g, '_')
+        .slice(0, 60) || 'Employee';
+    }
+
+    function setVal(path, value) {
+      const parts = path.split('.');
+      let obj = state.formData;
+      for (let i = 0; i < parts.length - 1; i++) obj = obj[parts[i]];
+      obj[parts[parts.length - 1]] = value;
+    }
+
+    function digitsOnly(val, maxLen) {
+      return String(val || '').replace(/\D/g, '').slice(0, maxLen);
+    }
+
+    function getSelectedLocationLabel() {
+      const loc = LOCATIONS.find(l => l.id === state.formData.location.selectedId);
+      return loc ? loc.label : '';
+    }
+
+    async function loadImageAsDataURL(url) {
+      if (!url) return null;
+      try {
+        const res = await fetch(url, { cache: 'no-store' });
+        const blob = await res.blob();
+        return await new Promise((resolve) => {
+          const r = new FileReader();
+          r.onload = () => resolve(r.result);
+          r.readAsDataURL(blob);
+        });
+      } catch (e) {
+        return null;
+      }
+    }
+
+    // ==========================================================
+    // VALIDATION
+    // ==========================================================
+    function validateForm() {
+      const requiredIds = [
+        'employeeName',
+        'startDate',
+        'department',
+        'position',
+        'reportsTo',
+        'outlookAddress',
+        'locationSelect',
+        'requestedByName'
+      ];
+
+      for (const id of requiredIds) {
+        const el = document.getElementById(id);
+        if (el && !el.checkValidity()) {
+          el.reportValidity();
+          return false;
+        }
+      }
+
+      const eq = state.formData.equipment;
+      if (!eq.computerType && !eq.phone) {
+        alert('Please select at least one equipment option (Desktop/Laptop and/or Phone).');
+        return false;
+      }
+      return true;
+    }
+
+    // ==========================================================
+    // RULES
+    // ==========================================================
+    function applyFormTypeRules() {
+      const endDateEl = document.getElementById('endDate');
+      if (!endDateEl) return;
+
+      if (state.formType === 'Update') {
+        endDateEl.disabled = false;
+        endDateEl.classList.remove('bg-gray-100', 'cursor-not-allowed');
+      } else {
+        state.formData.endDate = '';
+        endDateEl.value = '';
+        endDateEl.disabled = true;
+        endDateEl.classList.add('bg-gray-100', 'cursor-not-allowed');
+      }
+    }
+
+    function applyPhoneRules() {
+      const ext = document.getElementById('extension');
+      if (!ext) return;
+
+      const enabled = !!state.formData.equipment.phone;
+      ext.disabled = !enabled;
+
+      if (enabled) {
+        ext.classList.remove('bg-gray-100', 'cursor-not-allowed');
+      } else {
+        state.formData.phone.extension = '';
+        ext.value = '';
+        ext.classList.add('bg-gray-100', 'cursor-not-allowed');
+      }
+    }
+
+    // Outlook validation: must contain @ and end in .com
+    function applyOutlookValidation() {
+      const el = document.getElementById('outlookAddress');
+      if (!el) return;
+
+      el.addEventListener('input', () => {
+        const v = String(el.value || '').trim();
+        if (!v) { el.setCustomValidity(''); return; }
+
+        const hasAt = v.includes('@');
+        const endsCom = v.toLowerCase().endsWith('.com');
+
+        if (!hasAt || !endsCom) {
+          el.setCustomValidity('Please enter a valid email address that includes "@" and ends with ".com".');
+        } else {
+          el.setCustomValidity('');
+        }
+      });
+    }
+
+    // ==========================================================
+    // PDF (Corporate touch, similar to your example)
+    // ==========================================================
+    async function generateAndDownloadPDF_Corporate() {
+      const { jsPDF } = window.jspdf;
+
+      const doc = new jsPDF({ unit: 'mm', format: 'letter' });
+      const pageW = doc.internal.pageSize.getWidth();
+      const pageH = doc.internal.pageSize.getHeight();
+
+      const BLUE = [0, 44, 95];      // #002c5f
+      const GRAY = [120, 130, 145];
+      const TEXT = [25, 30, 38];
+      const LINE = [210, 215, 225];
+
+      const margin = 14;
+      const colGap = 10;
+      const colW = (pageW - margin * 2 - colGap) / 2;
+
+      const xL = margin;
+      const xR = margin + colW + colGap;
+
+      const fd = state.formData;
+      const iso = todayISO();
+      const genDate = formatDisplayDate(iso);
+
+      const setFont = (style = 'normal') => doc.setFont('helvetica', style);
+
+      function hline(y) {
+        doc.setDrawColor(...LINE);
+        doc.setLineWidth(0.35);
+        doc.line(margin, y, pageW - margin, y);
+      }
+
+      function sectionTitle(title, y) {
+        setFont('bold');
+        doc.setFontSize(11.5);
+        doc.setTextColor(...BLUE);
+        doc.text(title.toUpperCase(), margin, y);
+        hline(y + 2);
+        return y + 8;
+      }
+
+      function labelValue(x, y, label, value, maxW) {
+        const val = (value ?? '').toString().trim();
+        const display = val; // keep clean (blank if empty)
+
+        setFont('bold');
+        doc.setFontSize(9);
+        doc.setTextColor(...GRAY);
+        doc.text(`${label}:`, x, y);
+
+        setFont('normal');
+        doc.setFontSize(10);
+        doc.setTextColor(...TEXT);
+
+        const lines = doc.splitTextToSize(display, maxW);
+        const valueX = x + 26;
+
+        if (lines.length <= 1) {
+          doc.text(lines[0] || '', valueX, y);
+          return y + 6;
+        } else {
+          doc.text(lines, valueX, y);
+          return y + 6 + (lines.length - 1) * 4.2;
+        }
+      }
+
+      function kvRow2Col(y, leftItems, rightItems) {
+        let yL = y;
+        let yR = y;
+
+        const maxW = colW - 30;
+
+        leftItems.forEach(it => { yL = labelValue(xL, yL, it.label, it.value, maxW); });
+        rightItems.forEach(it => { yR = labelValue(xR, yR, it.label, it.value, maxW); });
+
+        return Math.max(yL, yR) + 2;
+      }
+
+      function ensureSpace(y, needed) {
+        if (y + needed <= pageH - 16) return y;
+        doc.addPage();
+        return 18;
+      }
+
+      async function drawLogoIfAny() {
+        if (!COMPANY.logoUrl) return null;
+        try {
+          const dataUrl = await loadImageAsDataURL(COMPANY.logoUrl);
+          return dataUrl;
+        } catch { return null; }
+      }
+
+      // ===== Header =====
+      let y = 16;
+
+      const logo = await drawLogoIfAny();
+      if (logo) {
+        try { doc.addImage(logo, 'PNG', margin, y - 6, 16, 16); } catch {}
+      }
+
+      setFont('bold');
+      doc.setFontSize(18);
+      doc.setTextColor(...TEXT);
+      doc.text('EMPLOYEE RECORD', pageW / 2, y, { align: 'center' });
+
+      setFont('normal');
+      doc.setFontSize(10.5);
+      doc.setTextColor(...GRAY);
+      doc.text(COMPANY.companyName, pageW / 2, y + 5.5, { align: 'center' });
+
+      doc.setFontSize(9.5);
+      doc.text(`Generated on: ${genDate}`, pageW / 2, y + 10.5, { align: 'center' });
+
+      doc.setDrawColor(...BLUE);
+      doc.setLineWidth(0.8);
+      doc.line(margin, y + 14.5, pageW - margin, y + 14.5);
+
+      y += 22;
+
+      // ===== FORM TYPE =====
+      y = ensureSpace(y, 28);
+      y = sectionTitle('Form Type', y);
+      setFont('normal');
+      doc.setFontSize(10);
+      doc.setTextColor(...TEXT);
+      doc.text(`Selected: ${state.formType === 'Update' ? 'Update' : 'New'}`, margin, y);
+      y += 10;
+
+      // ===== EMPLOYEE INFORMATION =====
+      y = ensureSpace(y, 42);
+      y = sectionTitle('Employee Information', y);
+
+      y = kvRow2Col(
+        y,
+        [
+          { label: 'Employee name', value: fd.employeeName },
+          { label: 'Department', value: fd.department },
+          { label: 'Position', value: fd.position }
+        ],
+        [
+          { label: 'Start date', value: formatDisplayDate(fd.startDate) },
+          { label: 'End date', value: formatDisplayDate(fd.endDate) },
+          { label: 'Reports to', value: fd.reportsTo }
+        ]
+      );
+
+      y += 6;
+
+      // ===== EQUIPMENT =====
+      y = ensureSpace(y, 34);
+      y = sectionTitle('Equipment', y);
+
+      const computer = fd.equipment.computerType || '';
+      const phoneYesNo = fd.equipment.phone ? 'Yes' : 'No';
+
+      // No Direct # in PDF
+      const extVal = (fd.phone.extension || '').trim();
+      const cellVal = (fd.phone.cellular || '').trim();
+
+      y = kvRow2Col(
+        y,
+        [
+          { label: 'Computer', value: computer },
+          ...(extVal || fd.equipment.phone ? [{ label: 'Extension #', value: extVal }] : []),
+          ...(cellVal ? [{ label: 'Cellular #', value: cellVal }] : [])
+        ],
+        [
+          { label: 'Phone', value: phoneYesNo }
+        ]
+      );
+
+      y += 6;
+
+      // ===== ACCESS =====
+      y = ensureSpace(y, 34);
+      y = sectionTitle('Access', y);
+
+      y = kvRow2Col(
+        y,
+        [
+          { label: 'Windows code', value: fd.access.windowsCode || '' },
+          { label: 'Outlook address', value: fd.access.outlookAddress || '' }
+        ],
+        [
+          { label: 'SAP user (*)', value: fd.access.sapUser || '' }
+        ]
+      );
+
+      y += 6;
+
+      // ===== LOCATION =====
+      y = ensureSpace(y, 34);
+      y = sectionTitle('Location', y);
+
+      y = kvRow2Col(
+        y,
+        [
+          { label: 'Selected', value: getSelectedLocationLabel() || '' },
+          { label: 'Office number', value: fd.location.officeNumber || '' }
+        ],
+        [
+          { label: 'Other', value: fd.location.other || '' }
+        ]
+      );
+
+      y += 6;
+
+      // ===== COMMENTS =====
+      y = ensureSpace(y, 44);
+      y = sectionTitle('Comments', y);
+
+      setFont('normal');
+      doc.setFontSize(10);
+      doc.setTextColor(...TEXT);
+
+      const commentText = (fd.comments || '').toString().trim();
+      if (!commentText) {
+        doc.setTextColor(...GRAY);
+        doc.text('(No comments)', margin, y);
+        doc.setTextColor(...TEXT);
+        y += 10;
+      } else {
+        const lines = doc.splitTextToSize(commentText, pageW - margin * 2);
+        let i = 0;
+        while (i < lines.length) {
+          y = ensureSpace(y, 12);
+          const chunk = lines.slice(i, i + 10);
+          doc.text(chunk, margin, y);
+          y += chunk.length * 5;
+          i += 10;
+        }
+        y += 6;
+      }
+
+      // ===== SIGNATURES (Requested by only) =====
+      y = ensureSpace(y, 40);
+      y = sectionTitle('Signatures', y);
+
+      setFont('bold');
+      doc.setFontSize(10);
+      doc.setTextColor(...TEXT);
+      doc.text('Requested by', margin, y);
+      y += 8;
+
+      const sigName = fd.signatures.requestedByName || '';
+      const sigText = fd.signatures.requestedBySignature || '';
+      const sigDate = formatDisplayDate(fd.signatures.requestedByDate) || '';
+
+      // Name
+      setFont('bold'); doc.setFontSize(9); doc.setTextColor(...GRAY);
+      doc.text('NAME', margin, y);
+      setFont('normal'); doc.setFontSize(10); doc.setTextColor(...TEXT);
+      doc.text(sigName, margin, y + 5);
+
+      // Signature line
+      const sigLineX = margin + 70;
+      const sigLineW = 80;
+
+      setFont('bold'); doc.setFontSize(9); doc.setTextColor(...GRAY);
+      doc.text('SIGNATURE', sigLineX, y);
+      doc.setDrawColor(...LINE);
+      doc.setLineWidth(0.5);
+      doc.line(sigLineX, y + 6, sigLineX + sigLineW, y + 6);
+      setFont('normal'); doc.setFontSize(10); doc.setTextColor(...TEXT);
+      doc.text(sigText.toString().slice(0, 36), sigLineX, y + 5);
+
+      // Date
+      const dateX = pageW - margin - 35;
+      setFont('bold'); doc.setFontSize(9); doc.setTextColor(...GRAY);
+      doc.text('DATE', dateX, y);
+      setFont('normal'); doc.setFontSize(10); doc.setTextColor(...TEXT);
+      doc.text(sigDate, dateX, y + 5);
+
+      // Footer
+      doc.setDrawColor(...LINE);
+      doc.setLineWidth(0.35);
+      doc.line(margin, pageH - 18, pageW - margin, pageH - 18);
+      setFont('normal');
+      doc.setFontSize(9);
+      doc.setTextColor(...GRAY);
+      doc.text('Prepared by IT Department', pageW / 2, pageH - 10, { align: 'center' });
+
+      const filename = `Employee_Record_${safeFilenamePart(fd.employeeName)}_${iso}.pdf`;
+      doc.save(filename);
+    }
+
+    // ==========================================================
+    // SUBMIT (PDF + mailto)
+    // ==========================================================
+    async function handleSubmit() {
+      if (!validateForm()) return;
+
+      await generateAndDownloadPDF_Corporate();
+
+      const subject = encodeURIComponent(`Employee Record - ${state.formType}: ${state.formData.employeeName || ''}`);
+
+      const bodyLines = [
+        `Dear Team,`,
+        ``,
+        `Please find below the details for the Employee Record submission.`,
+        ``,
+        `FORM TYPE: ${state.formType}`,
+        ``,
+        `EMPLOYEE INFORMATION:`,
+        `Employee name: ${state.formData.employeeName}`,
+        `Start date: ${formatDisplayDate(state.formData.startDate)}`,
+        `End date: ${formatDisplayDate(state.formData.endDate)}`,
+        `Department: ${state.formData.department}`,
+        `Position: ${state.formData.position}`,
+        `Reports to: ${state.formData.reportsTo}`,
+        ``,
+        `EQUIPMENT:`,
+        `Computer: ${state.formData.equipment.computerType || 'None'}`,
+        `Phone: ${state.formData.equipment.phone ? 'Yes' : 'No'}`,
+        `Extension #: ${state.formData.phone.extension}`,
+        `Cellular #: ${state.formData.phone.cellular}`,
+        ``,
+        `ACCESS:`,
+        `Windows code: ${state.formData.access.windowsCode}`,
+        `Outlook address: ${state.formData.access.outlookAddress}`,
+        `SAP user: ${state.formData.access.sapUser}`,
+        ``,
+        `LOCATION:`,
+        `Selected: ${getSelectedLocationLabel()}`,
+        `Office number: ${state.formData.location.officeNumber}`,
+        `Other: ${state.formData.location.other}`,
+        ``,
+        `COMMENTS:`,
+        `${state.formData.comments}`,
+        ``,
+        `IMPORTANT: The PDF was downloaded automatically. Please attach it to this email before sending.`,
+        ``,
+        `Best regards,`,
+        `Employee Record System`
+      ];
+
+      const body = encodeURIComponent(bodyLines.join('\n'));
+      const recipient = 'hr@company.com';
+      window.location.href = `mailto:${recipient}?subject=${subject}&body=${body}`;
+    }
+
+    // ==========================================================
+    // CLEAR
+    // ==========================================================
+    function clearFormSilent() {
+      state.formType = 'New';
+      state.formData = {
+        employeeName: '',
+        startDate: todayISO(),
+        endDate: '',
+        department: '',
+        position: '',
+        reportsTo: '',
+
+        equipment: { computerType: '', phone: false },
+        phone: { extension: '', cellular: '' },
+
+        access: { windowsCode: '', outlookAddress: '', sapUser: '' },
+
+        location: { selectedId: '', officeNumber: '', other: '' },
+
+        comments: '',
+
+        signatures: {
+          requestedByName: '',
+          requestedBySignature: '',
+          requestedByDate: todayISO()
+        }
+      };
+      render();
+    }
+
+    function handleClearForm() {
+      if (!confirm('Clear the form?')) return;
+      clearFormSilent();
+    }
+
+    // ==========================================================
+    // RENDER
+    // ==========================================================
+    function render() {
+      const app = document.getElementById('app');
+      const fd = state.formData;
+
+      app.innerHTML = `
+        <div class="max-w-5xl mx-auto bg-white shadow-2xl rounded-lg overflow-hidden">
+          <!-- Header -->
+          <div class="hyundai-blue p-6">
+            <div class="flex items-center justify-between gap-6">
+              <div class="flex items-center space-x-4">
+                <div class="w-14 h-14 bg-white rounded-full flex items-center justify-center overflow-hidden">
+                  ${
+                    COMPANY.logoUrl
+                      ? `<img src="${COMPANY.logoUrl}" alt="Logo" class="w-14 h-14 object-contain">`
+                      : `<span class="hyundai-blue-text font-black text-xl">IT</span>`
+                  }
+                </div>
+                <div>
+                  <h1 class="text-2xl md:text-3xl font-extrabold text-white tracking-wide">EMPLOYEE RECORD</h1>
+                  <p class="text-blue-100 text-sm mt-1">${COMPANY.companyName}</p>
+                </div>
+              </div>
+
+              <div class="text-right text-blue-100 text-sm">
+                <div class="font-semibold">Form Date</div>
+                <div>${formatDisplayDate(todayISO())}</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Content -->
+          <div class="p-6 md:p-8">
+
+            <!-- FORM TYPE -->
+            <div class="mb-8">
+              <h2 class="text-lg font-extrabold hyundai-blue-text uppercase tracking-wider mb-4 border-b pb-2">
+                Form Type
+              </h2>
+
+              <div class="flex flex-col md:flex-row gap-4">
+                <label class="flex items-center gap-3 border-2 border-gray-200 rounded-lg px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors">
+                  <input type="radio" name="formType" id="typeNew" ${state.formType === 'New' ? 'checked' : ''}>
+                  <div>
+                    <div class="font-bold text-gray-800">New</div>
+                    <div class="text-xs text-gray-500">For onboarding / first setup</div>
+                  </div>
+                </label>
+
+                <label class="flex items-center gap-3 border-2 border-gray-200 rounded-lg px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors">
+                  <input type="radio" name="formType" id="typeUpdate" ${state.formType === 'Update' ? 'checked' : ''}>
+                  <div>
+                    <div class="font-bold text-gray-800">Update</div>
+                    <div class="text-xs text-gray-500">For changes / updates</div>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            <!-- EMPLOYEE INFORMATION -->
+            <div class="mb-8">
+              <h2 class="text-lg font-extrabold hyundai-blue-text uppercase tracking-wider mb-4 border-b pb-2">
+                Employee Information
+              </h2>
+
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label for="employeeName" class="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-wide">Employee name *</label>
+                  <input type="text" id="employeeName" required value="${fd.employeeName}"
+                    class="w-full px-4 py-3 border-2 border-gray-300 focus:border-blue-900 focus:outline-none transition-colors"
+                    placeholder="John Doe">
+                </div>
+
+                <div>
+                  <label for="startDate" class="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-wide">Start Date *</label>
+                  <input type="date" id="startDate" required value="${fd.startDate || todayISO()}"
+                    class="w-full px-4 py-3 border-2 border-gray-300 focus:border-blue-900 focus:outline-none transition-colors">
+                </div>
+
+                <div>
+                  <label for="department" class="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-wide">Department *</label>
+                  <select id="department" required
+                    class="w-full px-4 py-3 border-2 border-gray-300 focus:border-blue-900 focus:outline-none transition-colors">
+                    <option value="">Select a department...</option>
+                    ${DEPARTMENTS.map(d => `<option value="${d}" ${fd.department === d ? 'selected' : ''}>${d}</option>`).join('')}
+                  </select>
+                </div>
+
+                <div>
+                  <div class="flex items-end justify-between gap-3 mb-2">
+                    <label for="endDate" class="block text-sm font-bold text-gray-700 uppercase tracking-wide">End Date</label>
+                    <span class="text-xs text-gray-500">Enabled only when <b>Update</b> is selected.</span>
+                  </div>
+                  <input type="date" id="endDate" value="${fd.endDate}"
+                    class="w-full px-4 py-3 border-2 border-gray-300 focus:border-blue-900 focus:outline-none transition-colors bg-gray-100 cursor-not-allowed"
+                    disabled>
+                </div>
+
+                <div>
+                  <label for="position" class="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-wide">Position *</label>
+                  <input type="text" id="position" required value="${fd.position}"
+                    class="w-full px-4 py-3 border-2 border-gray-300 focus:border-blue-900 focus:outline-none transition-colors"
+                    placeholder="e.g., Analyst">
+                </div>
+
+                <div>
+                  <label for="reportsTo" class="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-wide">Reports to *</label>
+                  <input type="text" id="reportsTo" required value="${fd.reportsTo}"
+                    class="w-full px-4 py-3 border-2 border-gray-300 focus:border-blue-900 focus:outline-none transition-colors"
+                    placeholder="Supervisor name">
+                </div>
+              </div>
+            </div>
+
+            <!-- EQUIPMENT -->
+            <div class="mb-8">
+              <h2 class="text-lg font-extrabold hyundai-blue-text uppercase tracking-wider mb-4 border-b pb-2">
+                Equipment
+              </h2>
+
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <label class="flex items-center gap-3 border-2 border-gray-200 rounded-lg px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors">
+                  <input type="radio" name="computerType" id="computerDesktop" ${fd.equipment.computerType === 'Desktop' ? 'checked' : ''}>
+                  <span class="font-bold text-gray-800">Desktop</span>
+                </label>
+
+                <label class="flex items-center gap-3 border-2 border-gray-200 rounded-lg px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors">
+                  <input type="radio" name="computerType" id="computerLaptop" ${fd.equipment.computerType === 'Laptop' ? 'checked' : ''}>
+                  <span class="font-bold text-gray-800">Laptop</span>
+                </label>
+              </div>
+
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-2">
+                <label class="flex items-center gap-3 border-2 border-gray-200 rounded-lg px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors">
+                  <input type="checkbox" id="phone" ${fd.equipment.phone ? 'checked' : ''}>
+                  <span class="font-bold text-gray-800">Phone</span>
+                </label>
+
+                <div>
+                  <label for="extension" class="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-wide">Extension #</label>
+                  <input type="text" id="extension" value="${fd.phone.extension}"
+                    inputmode="numeric" pattern="\\d*" maxlength="6"
+                    class="w-full px-4 py-3 border-2 border-gray-300 focus:border-blue-900 focus:outline-none transition-colors ${fd.equipment.phone ? '' : 'bg-gray-100 cursor-not-allowed'}"
+                    placeholder="e.g. 1234" ${fd.equipment.phone ? '' : 'disabled'}>
+                </div>
+
+                <div>
+                  <label for="cellular" class="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-wide">Cellular #</label>
+                  <input type="text" id="cellular" value="${fd.phone.cellular}"
+                    inputmode="numeric" pattern="\\d*"
+                    class="w-full px-4 py-3 border-2 border-gray-300 focus:border-blue-900 focus:outline-none transition-colors"
+                    placeholder="e.g. 7875551234">
+                </div>
+              </div>
+
+              <div class="text-xs text-gray-500 mt-2">
+                Desktop/Laptop are exclusive (radio). Phone can be added independently.
+              </div>
+            </div>
+
+            <!-- ACCESS -->
+            <div class="mb-8">
+              <h2 class="text-lg font-extrabold hyundai-blue-text uppercase tracking-wider mb-4 border-b pb-2">
+                Access
+              </h2>
+
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label for="windowsCode" class="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-wide">Windows - Code</label>
+                  <input type="text" id="windowsCode" value="${fd.access.windowsCode}"
+                    class="w-full px-4 py-3 border-2 border-gray-300 focus:border-blue-900 focus:outline-none transition-colors"
+                    placeholder="e.g., jdoe">
+                </div>
+
+                <div>
+                  <label for="outlookAddress" class="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-wide">Outlook - Address *</label>
+                  <input
+                    type="text"
+                    id="outlookAddress"
+                    required
+                    value="${fd.access.outlookAddress}"
+                    class="w-full px-4 py-3 border-2 border-gray-300 focus:border-blue-900 focus:outline-none transition-colors"
+                    placeholder="name@company.com"
+                    pattern="^[^\\s@]+@[^\\s@]+\\.com$"
+                    title='Please enter a valid email address that includes "@" and ends with ".com".'
+                  >
+                </div>
+
+                <div class="md:col-span-2">
+                  <label for="sapUser" class="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-wide">SAP User (*)</label>
+                  <input type="text" id="sapUser" value="${fd.access.sapUser}"
+                    class="w-full px-4 py-3 border-2 border-gray-300 focus:border-blue-900 focus:outline-none transition-colors"
+                    placeholder="Describe needed SAP roles / access">
+                  <p class="text-xs text-gray-500 mt-2">
+                    (*) Include here access needed by the worker according to its position and functions.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <!-- LOCATION -->
+            <div class="mb-8">
+              <h2 class="text-lg font-extrabold hyundai-blue-text uppercase tracking-wider mb-4 border-b pb-2">
+                Location
+              </h2>
+
+              <div class="mb-6">
+                <label for="locationSelect" class="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-wide">
+                  Location *
+                </label>
+                <select id="locationSelect" required
+                  class="w-full px-4 py-3 border-2 border-gray-300 focus:border-blue-900 focus:outline-none transition-colors">
+                  <option value="">Select a location...</option>
+                  ${LOCATIONS.map(loc => `
+                    <option value="${loc.id}" ${fd.location.selectedId === loc.id ? 'selected' : ''}>
+                      ${loc.label}
+                    </option>
+                  `).join('')}
+                </select>
+              </div>
+
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label for="officeNumber" class="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-wide">Office number</label>
+                  <input type="text" id="officeNumber" value="${fd.location.officeNumber}"
+                    class="w-full px-4 py-3 border-2 border-gray-300 focus:border-blue-900 focus:outline-none transition-colors"
+                    placeholder="e.g., 204">
+                </div>
+
+                <div>
+                  <label for="otherLocation" class="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-wide">Other</label>
+                  <input type="text" id="otherLocation" value="${fd.location.other}"
+                    class="w-full px-4 py-3 border-2 border-gray-300 focus:border-blue-900 focus:outline-none transition-colors"
+                    placeholder="Any other location details">
+                </div>
+              </div>
+            </div>
+
+            <!-- COMMENTS -->
+            <div class="mb-8">
+              <h2 class="text-lg font-extrabold hyundai-blue-text uppercase tracking-wider mb-4 border-b pb-2">
+                Comments
+              </h2>
+
+              <textarea id="comments" rows="4"
+                class="w-full px-4 py-3 border-2 border-gray-300 focus:border-blue-900 focus:outline-none transition-colors"
+                placeholder="Additional notes...">${fd.comments || ''}</textarea>
+            </div>
+
+            <!-- SIGNATURES -->
+            <div class="mb-8">
+              <h2 class="text-lg font-extrabold hyundai-blue-text uppercase tracking-wider mb-4 border-b pb-2">
+                Signatures
+              </h2>
+
+              <div class="grid grid-cols-1 gap-6">
+                <div class="border-2 border-gray-200 rounded-lg p-5">
+                  <div class="font-extrabold text-gray-800 mb-4 uppercase tracking-wide text-sm">Requested by</div>
+                  <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div>
+                      <label for="requestedByName" class="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-wide">Name *</label>
+                      <input type="text" id="requestedByName" required value="${fd.signatures.requestedByName}"
+                        class="w-full px-4 py-3 border-2 border-gray-300 focus:border-blue-900 focus:outline-none transition-colors"
+                        placeholder="Name">
+                    </div>
+                    <div>
+                      <label for="requestedBySignature" class="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-wide">Signature</label>
+                      <input type="text" id="requestedBySignature" value="${fd.signatures.requestedBySignature}"
+                        class="w-full px-4 py-3 border-2 border-gray-300 focus:border-blue-900 focus:outline-none transition-colors"
+                        placeholder="Type name / initials">
+                    </div>
+                    <div>
+                      <label for="requestedByDate" class="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-wide">Date</label>
+                      <input type="date" id="requestedByDate" value="${fd.signatures.requestedByDate || todayISO()}"
+                        class="w-full px-4 py-3 border-2 border-gray-300 focus:border-blue-900 focus:outline-none transition-colors">
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Buttons -->
+            <div class="flex flex-col md:flex-row gap-4 justify-end no-print">
+              <button id="clearBtn" type="button"
+                class="px-6 py-3 rounded-lg font-bold tracking-wide border-2 border-gray-300 hover:border-gray-400 transition-colors">
+                Clear Form
+              </button>
+
+              <button id="submitBtn" type="button"
+                class="hyundai-blue text-white px-8 py-3 rounded-lg font-extrabold tracking-wide hover:opacity-90 transition-opacity">
+                Submit (PDF + Outlook)
+              </button>
+            </div>
+          </div>
+
+          <!-- Footer -->
+          <div class="p-4 bg-gray-100 text-center text-xs text-gray-600">
+            For internal use only • ${COMPANY.companyName} • Generated on ${formatDisplayDate(todayISO())}
+          </div>
+        </div>
+      `;
+
+      // FORM TYPE
+      document.getElementById('typeNew')?.addEventListener('change', () => {
+        state.formType = 'New';
+        applyFormTypeRules();
+      });
+      document.getElementById('typeUpdate')?.addEventListener('change', () => {
+        state.formType = 'Update';
+        applyFormTypeRules();
+      });
+
+      // EMPLOYEE INFO
+      document.getElementById('employeeName')?.addEventListener('input', (e) => setVal('employeeName', e.target.value));
+      document.getElementById('startDate')?.addEventListener('change', (e) => setVal('startDate', e.target.value));
+      document.getElementById('endDate')?.addEventListener('change', (e) => setVal('endDate', e.target.value));
+      document.getElementById('department')?.addEventListener('change', (e) => setVal('department', e.target.value));
+      document.getElementById('position')?.addEventListener('input', (e) => setVal('position', e.target.value));
+      document.getElementById('reportsTo')?.addEventListener('input', (e) => setVal('reportsTo', e.target.value));
+
+      // EQUIPMENT
+      document.getElementById('computerDesktop')?.addEventListener('change', (e) => {
+        if (e.target.checked) state.formData.equipment.computerType = 'Desktop';
+      });
+      document.getElementById('computerLaptop')?.addEventListener('change', (e) => {
+        if (e.target.checked) state.formData.equipment.computerType = 'Laptop';
+      });
+
+      document.getElementById('phone')?.addEventListener('change', (e) => {
+        setVal('equipment.phone', !!e.target.checked);
+        applyPhoneRules();
+      });
+
+      document.getElementById('extension')?.addEventListener('input', (e) => {
+        const v = digitsOnly(e.target.value, 6);
+        e.target.value = v;
+        setVal('phone.extension', v);
+      });
+
+      document.getElementById('cellular')?.addEventListener('input', (e) => {
+        const v = digitsOnly(e.target.value, 12);
+        e.target.value = v;
+        setVal('phone.cellular', v);
+      });
+
+      // ACCESS
+      document.getElementById('windowsCode')?.addEventListener('input', (e) => setVal('access.windowsCode', e.target.value));
+      document.getElementById('outlookAddress')?.addEventListener('input', (e) => setVal('access.outlookAddress', e.target.value));
+      applyOutlookValidation();
+      document.getElementById('sapUser')?.addEventListener('input', (e) => setVal('access.sapUser', e.target.value));
+
+      // LOCATION
+      document.getElementById('locationSelect')?.addEventListener('change', (e) => {
+        state.formData.location.selectedId = e.target.value || '';
+      });
+      document.getElementById('officeNumber')?.addEventListener('input', (e) => setVal('location.officeNumber', e.target.value));
+      document.getElementById('otherLocation')?.addEventListener('input', (e) => setVal('location.other', e.target.value));
+
+      // COMMENTS
+      document.getElementById('comments')?.addEventListener('input', (e) => setVal('comments', e.target.value));
+
+      // SIGNATURES
+      document.getElementById('requestedByName')?.addEventListener('input', (e) => setVal('signatures.requestedByName', e.target.value));
+      document.getElementById('requestedBySignature')?.addEventListener('input', (e) => setVal('signatures.requestedBySignature', e.target.value));
+      document.getElementById('requestedByDate')?.addEventListener('change', (e) => setVal('signatures.requestedByDate', e.target.value));
+
+      // BUTTONS
+      document.getElementById('clearBtn')?.addEventListener('click', handleClearForm);
+      document.getElementById('submitBtn')?.addEventListener('click', handleSubmit);
+
+      // Apply rules
+      applyFormTypeRules();
+      applyPhoneRules();
+    }
+
+    // ==========================================================
+    // INIT
+    // ==========================================================
+    clearFormSilent();
+  </script>
+</body>
+</html>
