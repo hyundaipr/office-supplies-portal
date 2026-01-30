@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Office Supply Request - Hyundai</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  
+  <style>
+    /* Aplicando la fuente moderna y un fondo suave */
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #f1f5f9; /* Slate-100 */
+      color: #334155; /* Slate-700 */
+      -webkit-font-smoothing: antialiased;
+    }
+    
+    /* Variables de marca */
+    .hyundai-blue-bg { background-color: #002c5f; }
+    .hyundai-blue-text { color: #002c5f; }
+    .hyundai-blue-border { border-color: #002c5f; }
+
+    /* Estilos personalizados para inputs */
+    .modern-input {
+      transition: all 0.2s ease-in-out;
+    }
+    .modern-input:focus {
+      border-color: #002c5f;
+      box-shadow: 0 0 0 3px rgba(0, 44, 95, 0.15);
+    }
+
+    @media print {
+      body { background: white; }
+      .no-print { display: none !important; }
+      .print-only { display: block !important; }
+      .shadow-2xl { box-shadow: none !important; }
+      .rounded-2xl { border-radius: 0 !important; }
+    }
+  </style>
+</head>
+
+<body class="min-h-screen py-8 px-4 sm:px-6 lg:px-8 flex justify-center items-start">
+  <div id="app" class="w-full max-w-5xl"></div>
+
+  <script>
+    // ==========================
+    // SUPPLY CATALOG (SIN CAMBIOS)
+    // ==========================
+    const SUPPLY_ITEMS = [
+      { "key": "address_labels", "label": "Address Labels", "details": [ { "key": "2_3_x_3_1_16", "label": "2/3\" x 3 1/16\"" } ] },
+      { "key": "batteries", "label": "Batteries", "details": [ { "key": "aaa", "label": "AAA" }, { "key": "aa", "label": "AA" }, { "key": "c", "label": "C" }, { "key": "d", "label": "D" } ] },
+      { "key": "binder_clips", "label": "Binder Clips", "details": [ { "key": "mini", "label": "Mini" }, { "key": "small", "label": "Small" }, { "key": "medium", "label": "Medium" }, { "key": "large", "label": "Large" }, { "key": "jumbo", "label": "Jumbo" } ] },
+      { "key": "business_card_binder_pages_clear", "label": "Business Card Binder Pages Clear", "details": [] },
+      { "key": "business_envelopes_white", "label": "Business Envelopes White", "details": [ { "key": "10", "label": "#10" } ] },
+      { "key": "clear_front_notebooks_3_rings", "label": "Clear Front Notebooks 3 rings", "details": [ { "key": "1", "label": "1\"" }, { "key": "1_1_2", "label": "1 1/2\"" } ] },
+      { "key": "clear_front_report_covers_3_hole", "label": "Clear Front Report Covers 3 hole", "details": [ { "key": "blue", "label": "blue" }, { "key": "black", "label": "black" }, { "key": "dept_presentations", "label": "Dept. presentations" } ] },
+      { "key": "clip_boards_letter_size", "label": "Clip Boards letter size", "details": [ { "key": "hardboard", "label": "Hardboard" }, { "key": "plastic", "label": "Plastic" } ] },
+      { "key": "correction_tape", "label": "Correction Tape", "details": [ { "key": "white", "label": "White" } ] },
+      { "key": "desk_tape_dispenser", "label": "Desk Tape Dispenser", "details": [ { "key": "scotch", "label": "Scotch" } ] },
+      { "key": "easel_pad_flip_charts_2_pack", "label": "Easel Pad Flip Charts 2 Pack", "details": [ { "key": "27_x_34", "label": "27\"  x  34\"" } ] },
+      { "key": "eraser_lion", "label": "Eraser - Lion", "details": [] },
+      { "key": "executive_desk_calculator", "label": "Executive Desk Calculator", "details": [ { "key": "victor_1190", "label": "Victor 1190" }, { "key": "victor_1180_34", "label": "Victor 1180-34" } ] },
+      { "key": "expo_dry_erase_markers", "label": "Expo Dry Erase Markers", "details": [ { "key": "multi_color_pack", "label": "Multi-color Pack" } ] },
+      { "key": "expo_eraser", "label": "Expo Eraser", "details": [ { "key": "eraser_only", "label": "eraser only" } ] },
+      { "key": "expo_liquid_cleaner", "label": "Expo liquid cleaner", "details": [ { "key": "8_oz_bottles", "label": "8 oz bottles" } ] },
+      { "key": "extra_deep_desk_drawer_organizer_tray", "label": "Extra Deep Desk Drawer Organizer Tray", "details": [] },
+      { "key": "file_folder_labels", "label": "File Folder Labels", "details": [ { "key": "0_66_x_3_44", "label": "0.66 x 3.44" } ] },
+      { "key": "heavy_duty_box_sealing_tape", "label": "Heavy Duty Box Sealing Tape", "details": [ { "key": "3_core_clear", "label": "3\" core Clear" } ] },
+      { "key": "heavy_duty_stapler", "label": "Heavy Duty Stapler", "details": [ { "key": "swigline_adm", "label": "Swigline/ Adm" }, { "key": "bostich_w_h_emp", "label": "Bostich/ W/H Emp." } ] },
+      { "key": "heavy_duty_staplers", "label": "Heavy Duty Staplers", "details": [ { "key": "15_16_swingline", "label": "15/16\" Swingline" } ] },
+      { "key": "heavy_weight_manilla_folders", "label": "Heavy Weight Manilla Folders", "details": [ { "key": "reinforced_end_tab_with_fastener_finance_dept", "label": "Reinforced End Tab with fastener Finance Dept." } ] },
+      { "key": "highlighters", "label": "Highlighters", "details": [ { "key": "yellow", "label": "Yellow" }, { "key": "blue", "label": "Blue" }, { "key": "orange", "label": "Orange" }, { "key": "green", "label": "Green" }, { "key": "pink", "label": "Pink" } ] },
+      { "key": "highlighters_multi_colored_pack", "label": "Highlighters Multi-colored Pack", "details": [ { "key": "wide_chisel_tip", "label": "Wide Chisel Tip" } ] },
+      { "key": "hole_puncher", "label": "Hole Puncher", "details": [ { "key": "2_holes", "label": "2 holes" }, { "key": "3_holes", "label": "3 holes" } ] },
+      { "key": "inter_department_envelopes", "label": "Inter-Department Envelopes", "details": [] },
+      { "key": "jumbo_size_kraft_envelopes", "label": "Jumbo Size Kraft Envelopes", "details": [ { "key": "finance", "label": "Finance" } ] },
+      { "key": "kraft_file_folder_with_fastener", "label": "Kraft File Folder with fastener", "details": [ { "key": "reception", "label": "Reception" } ] },
+      { "key": "liquid_glue", "label": "Liquid Glue", "details": [] },
+      { "key": "manila_folder", "label": "Manila Folder", "details": [ { "key": "multi_color", "label": "Multi-color" }, { "key": "red", "label": "Red" }, { "key": "green", "label": "Green" } ] },
+      { "key": "mechanical_pencils", "label": "Mechanical Pencils", "details": [ { "key": "0_7_refills", "label": "0.7 Refills" } ] },
+      { "key": "non_studded_chair_mat", "label": "Non Studded Chair Mat", "details": [ { "key": "hard_floors", "label": "Hard Floors" }, { "key": "rug", "label": "Rug" } ] },
+      { "key": "numerical_end_tab_file_folder_labels", "label": "Numerical End Tab File Folder Labels", "details": [ { "key": "numbers_from_0_thrugh_10_finance_dept", "label": "Numbers from  0 thrugh 10 Finance Dept." } ] },
+      { "key": "office_chairs", "label": "Office Chairs", "details": [] },
+      { "key": "office_scissors_8", "label": "Office Scissors 8\"", "details": [ { "key": "stainless_steel", "label": "Stainless Steel" } ] },
+      { "key": "others", "label": "Others", "details": [] },
+      { "key": "packing_tape_dispenser", "label": "Packing Tape Dispenser", "details": [ { "key": "3_core", "label": "3\" core" } ] },
+      { "key": "panel_board_report_covers_3_hole", "label": "Panel & Board Report Covers 3 hole", "details": [ { "key": "blue", "label": "blue" }, { "key": "black", "label": "black" }, { "key": "new_hire_kits", "label": "New Hire Kits" } ] },
+      { "key": "paper_clips", "label": "Paper Clips", "details": [ { "key": "small", "label": "Small" }, { "key": "large", "label": "Large" } ] },
+      { "key": "paper_fasteners_2_piece_2_prong", "label": "Paper Fasteners - 2 piece 2 prong", "details": [ { "key": "2", "label": "2\"" } ] },
+      { "key": "paper_for_printers", "label": "Paper for Printers", "details": [] },
+      { "key": "paper_shredder", "label": "Paper Shredder", "details": [] },
+      { "key": "pencil_sharpener_bostich", "label": "Pencil Sharpener Bostich", "details": [ { "key": "black", "label": "Black" }, { "key": "beige", "label": "Beige" } ] },
+      { "key": "pencils", "label": "Pencils", "details": [ { "key": "2", "label": "#2" } ] },
+      { "key": "permanent_markers", "label": "Permanent  Markers", "details": [ { "key": "red", "label": "Red" }, { "key": "black", "label": "Black" }, { "key": "broad_chisel_w_h_inventory", "label": "Broad Chisel W/H Inventory" } ] },
+      { "key": "post_it_notes_multi_colored", "label": "Post-it-notes multi colored", "details": [ { "key": "3_x_3", "label": "3\"  x  3\"" }, { "key": "2_x_1_5", "label": "2\"  x  1.5\"" } ] },
+      { "key": "post_it_notes_yellow", "label": "Post-It-Notes Yellow", "details": [ { "key": "3_x_3", "label": "3\"  x  3\"" }, { "key": "2_x_1_5", "label": "2\"  x  1.5\"" } ] },
+      { "key": "premium_ruled_writing_pads", "label": "Premium Ruled Writing Pads", "details": [ { "key": "5_x_8", "label": "5\" x 8\"" }, { "key": "8_5_x_11", "label": "8.5\" x  11\"" } ] },
+      { "key": "pressboard_folders_with_fasteners", "label": "Pressboard Folders with fasteners", "details": [ { "key": "2_dividers_6_fasteners_3_expansion_grey_hdg_hr", "label": "2 dividers 6 fasteners 3\" expansion Grey HdG HR" } ] },
+      { "key": "redi_seal_catalogue_envelopes", "label": "Redi Seal Catalogue Envelopes", "details": [] },
+      { "key": "redrope_expanding_file_pockets", "label": "Redrope Expanding File Pockets", "details": [ { "key": "5_25_expansion", "label": "5.25\" expansion" } ] },
+      { "key": "rubber_bands", "label": "Rubber Bands", "details": [ { "key": "117", "label": "#117" }, { "key": "117b", "label": "#117B" }, { "key": "19", "label": "#19" }, { "key": "16", "label": "#16" }, { "key": "107", "label": "#107" } ] },
+      { "key": "ruler_12", "label": "Ruler - 12\"", "details": [ { "key": "metal", "label": "Metal" }, { "key": "wood", "label": "Wood" }, { "key": "clear_plastic", "label": "Clear Plastic" } ] },
+      { "key": "sharpie_markers", "label": "Sharpie Markers", "details": [ { "key": "red", "label": "Red" }, { "key": "black", "label": "Black" }, { "key": "chisel_tip_med", "label": "Chisel Tip Med" }, { "key": "fine_point", "label": "Fine Point" }, { "key": "extra_fine_point", "label": "Extra Fine Point" } ] },
+      { "key": "side_load_desk_trays", "label": "Side Load Desk Trays", "details": [ { "key": "letter_size", "label": "Letter Size" } ] },
+      { "key": "sign_here_arrow_flags", "label": "Sign Here -  Arrow Flags", "details": [ { "key": "multi_colored_packs", "label": "multi- colored packs" } ] },
+      { "key": "sign_here_flags", "label": "Sign Here Flags", "details": [ { "key": "yellow", "label": "Yellow" } ] },
+      { "key": "sortkwik_fingertip_moistener", "label": "Sortkwik Fingertip Moistener", "details": [ { "key": "7_75_oz", "label": "7.75 oz" }, { "key": "0_38_oz", "label": "0.38 oz" } ] },
+      { "key": "stamp_pad", "label": "Stamp Pad", "details": [ { "key": "red", "label": "Red" }, { "key": "black", "label": "Black" } ] },
+      { "key": "stamp_pad_ink_bottle", "label": "Stamp Pad Ink Bottle", "details": [ { "key": "red", "label": "Red" }, { "key": "black", "label": "Black" } ] },
+      { "key": "stapler_remover", "label": "Stapler remover", "details": [ { "key": "jaw_style", "label": "Jaw Style" }, { "key": "wand_style", "label": "Wand Style" } ] },
+      { "key": "staplers", "label": "Staplers", "details": [ { "key": "swigline_adm", "label": "Swigline/ Adm" }, { "key": "bostich_employees", "label": "Bostich/Employees" } ] },
+      { "key": "staples", "label": "Staples", "details": [ { "key": "standard", "label": "Standard" } ] },
+      { "key": "storage_file_bankers_box", "label": "Storage File Bankers Box", "details": [] },
+      { "key": "tab_dividers", "label": "Tab Dividers", "details": [ { "key": "a_to_z", "label": "A to Z" }, { "key": "numbered", "label": "Numbered" }, { "key": "ready_indez_dividers_if50544", "label": "Ready Indez Dividers IF50544" } ] },
+      { "key": "telescoping_easel_3_legs", "label": "Telescoping Easel (3 legs)", "details": [ { "key": "with_pad_retainer", "label": "with pad retainer" } ] },
+      { "key": "top_load_sheet_protectors", "label": "Top Load Sheet Protectors", "details": [ { "key": "heavyweight", "label": "Heavyweight" } ] },
+      { "key": "transparent_tape", "label": "Transparent Tape", "details": [ { "key": "1_core", "label": "1\"core" } ] },
+      { "key": "tze_laminated_labels", "label": "Tze Laminated Labels", "details": [ { "key": "1_white_tape", "label": "1\" white tape" }, { "key": "1_clear_tape", "label": "1\"  clear tape" } ] },
+      { "key": "other", "label": "Other", "details": [] }
+    ];
+
+    // ==========================
+    // STATE (SIN CAMBIOS)
+    // ==========================
+    const state = {
+      formData: {
+        name: '',
+        date: '',
+        department: '',
+        position: '',
+        contactExt: '',
+        email: ''
+      },
+      requestedItems: [] 
+    };
+
+    // ==========================
+    // HELPERS (SIN CAMBIOS)
+    // ==========================
+    function todayISO() {
+      const d = new Date();
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    }
+
+    function formatDisplayDate(iso) {
+      if (!iso) return '';
+      const [y, m, d] = iso.split('-');
+      return `${m}/${d}/${y}`;
+    }
+
+    function safeFilenamePart(str) {
+      return String(str || '')
+        .trim()
+        .replace(/[\/\\:*?"<>|]/g, '')
+        .replace(/\s+/g, '_')
+        .replace(/_+/g, '_')
+        .slice(0, 60) || 'User';
+    }
+
+    function updateFormData(field, value) {
+      state.formData[field] = value;
+    }
+
+    function getItemByKey(key) {
+      return SUPPLY_ITEMS.find(x => String(x.key) === String(key));
+    }
+
+    function getDetailLabel(itemKey, detailKey) {
+      const item = getItemByKey(itemKey);
+      if (!item || !Array.isArray(item.details)) return '';
+      const d = item.details.find(x => String(x.key) === String(detailKey));
+      return d ? d.label : '';
+    }
+
+    function itemRequiresDetail(itemKey) {
+      const item = getItemByKey(itemKey);
+      return !!(item && Array.isArray(item.details) && item.details.length > 0);
+    }
+
+    function getLineDescription(row) {
+      const item = getItemByKey(row.itemKey);
+      if (!item) return '';
+      const detail = row.detailKey
+        ? (row.itemKey === 'other' ? row.detailKey : getDetailLabel(row.itemKey, row.detailKey))
+        : '';
+      return detail ? `${item.label} - ${detail}` : `${item.label}`;
+    }
+
+    function buildItemOptions(selectedKey) {
+      return SUPPLY_ITEMS.map(it => `
+        <option value="${it.key}" ${String(selectedKey) === String(it.key) ? 'selected' : ''}>${it.label}</option>
+      `).join('');
+    }
+
+    function buildDetailOptions(itemKey, selectedDetailKey) {
+      const item = getItemByKey(itemKey);
+      if (!item || !Array.isArray(item.details) || item.details.length === 0) {
+        return `<option value="">—</option>`;
+      }
+      return [
+        `<option value="">Select detail...</option>`,
+        ...item.details.map(d => `
+          <option value="${d.key}" ${String(selectedDetailKey) === String(d.key) ? 'selected' : ''}>${d.label}</option>
+        `)
+      ].join('');
+    }
+
+    function clearFormSilent() {
+      state.formData = { name: '', date: '', department: '', position: '', contactExt: '', email: '' };
+      state.requestedItems = [];
+      state.formData.date = todayISO();
+      render();
+    }
+
+    // ==========================
+    // RENDER (ACTUALIZADO VISUALMENTE)
+    // ==========================
+    function render() {
+      const app = document.getElementById('app');
+
+      app.innerHTML = `
+        <div class="bg-white shadow-2xl rounded-2xl overflow-hidden border border-slate-100">
+          <div class="hyundai-blue-bg p-8 text-white relative overflow-hidden">
+            <div class="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+               <div class="flex items-center space-x-5">
+                <div class="w-20 h-20 bg-white rounded-full flex items-center justify-center shadow-lg">
+                  <img src="https://hyundaipr.sharepoint.com/sites/hyundaiit/Shared%20Documents/Apps/sojitz%20logo.png" class="w-16 h-16 object-contain">
+                </div>
+                <div>
+                  <h1 class="text-2xl font-bold tracking-tight">OFFICE SUPPLY REQUEST</h1>
+                  <p class="text-blue-200 text-sm font-medium mt-0.5">Sojitz de Puerto Rico</p>
+                </div>
+              </div>
+            </div>
+            <div class="absolute top-0 right-0 -mt-4 -mr-4 w-32 h-32 bg-white opacity-5 rounded-full blur-2xl"></div>
+          </div>
+
+          <div class="p-6 md:p-10 space-y-10">
+            
+            <section>
+              <div class="flex items-center space-x-2 mb-6 pb-2 border-b border-slate-100">
+                 <div class="w-1 h-6 hyundai-blue-bg rounded-full"></div>
+                 <h2 class="text-lg font-bold text-slate-800 uppercase tracking-wide">Requester Information</h2>
+              </div>
+
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+                <div class="group">
+                  <label for="name" class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 group-focus-within:text-blue-800 transition-colors">Full Name *</label>
+                  <input type="text" id="name" required value="${state.formData.name}"
+                    class="modern-input block w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-slate-700 placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-900/20 focus:border-blue-900 shadow-sm"
+                    placeholder="John Doe">
+                </div>
+
+                <div>
+                  <label for="date" class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Date</label>
+                  <input type="date" id="date"
+                    value="${todayISO()}" min="${todayISO()}" max="${todayISO()}" readonly
+                    class="block w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-slate-500 cursor-not-allowed shadow-inner font-medium">
+                </div>
+
+                <div class="group">
+                  <label for="department" class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 group-focus-within:text-blue-800 transition-colors">Department *</label>
+                  <select id="department" required
+                    class="modern-input block w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-900/20 focus:border-blue-900 shadow-sm appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23002c5f%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E')] bg-[length:0.7em] bg-[right_1rem_center] bg-no-repeat pr-10">
+                    <option value="">Select a department...</option>
+		    <option value="BDC" ${state.formData.department === 'BDC' ? 'selected' : ''}>BDC</option>
+                    <option value="Dealer Dev. & Process" ${state.formData.department === 'Dealer Dev. & Process' ? 'selected' : ''}>Dealer Dev. & Process</option>
+                    <option value="Executive" ${state.formData.department === 'Executive' ? 'selected' : ''}>Executive</option>
+                    <option value="FTZ" ${state.formData.department === 'FTZ' ? 'selected' : ''}>FTZ</option>
+                    <option value="F&I" ${state.formData.department === 'F&I' ? 'selected' : ''}>F&I</option>
+                    <option value="HR/Adm." ${state.formData.department === 'HR/Adm.' ? 'selected' : ''}>HR/Adm.</option>
+                    <option value="IT & Corporate Planning" ${state.formData.department === 'IT & Corporate Planning' ? 'selected' : ''}>IT & Corporate Planning</option>
+                    <option value="Logistics" ${state.formData.department === 'Logistics' ? 'selected' : ''}>Logistics</option>
+		    <option value="Marketing & Advertising" ${state.formData.department === 'Marketing & Advertising' ? 'selected' : ''}>Marketing & Advertising</option>
+                    <option value="Operations" ${state.formData.department === 'Operations' ? 'selected' : ''}>Operations</option>
+                    <option value="Sales" ${state.formData.department === 'Sales' ? 'selected' : ''}>Sales</option>
+                    <option value="Services-Parts" ${state.formData.department === 'Services-Parts' ? 'selected' : ''}>Services-Parts</option>
+                    <option value="Services-Warranty" ${state.formData.department === 'Services-Warranty' ? 'selected' : ''}>Services-Warranty</option>
+		    <option value="Strategic Planning" ${state.formData.department === 'Strategic Planning' ? 'selected' : ''}>Strategic Planning</option>
+                    <option value="Warehouse" ${state.formData.department === 'Warehouse' ? 'selected' : ''}>Warehouse</option>
+                  </select>
+                </div>
+
+                <div class="group">
+                  <label for="position" class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 group-focus-within:text-blue-800 transition-colors">Position *</label>
+                  <input type="text" id="position" required value="${state.formData.position}"
+                    class="modern-input block w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-slate-700 placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-900/20 focus:border-blue-900 shadow-sm"
+                    placeholder="e.g., Analyst">
+                </div>
+
+                <div class="group">
+                  <label for="contactExt" class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 group-focus-within:text-blue-800 transition-colors">Extension</label>
+                  <input type="text" id="contactExt" value="${state.formData.contactExt}"
+                    inputmode="numeric" pattern="\\d{4}" minlength="4" maxlength="4"
+                    class="modern-input block w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-slate-700 placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-900/20 focus:border-blue-900 shadow-sm"
+                    placeholder="e.g. 1234">
+                </div>
+
+                <div class="group">
+                  <label for="email" class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 group-focus-within:text-blue-800 transition-colors">Email *</label>
+                  <input type="email" id="email" required value="${state.formData.email}"
+                    class="modern-input block w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-slate-700 placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-900/20 focus:border-blue-900 shadow-sm"
+                    placeholder="johndoe@hyundaipr.com">
+                </div>
+              </div>
+            </section>
+
+            <section>
+              <div class="flex items-end justify-between mb-6 pb-2 border-b border-slate-100">
+                <div class="flex items-center space-x-2">
+                    <div class="w-1 h-6 hyundai-blue-bg rounded-full"></div>
+                    <h2 class="text-lg font-bold text-slate-800 uppercase tracking-wide">Supply Request</h2>
+                </div>
+                <button id="addItemBtn" type="button"
+                  class="flex items-center gap-2 px-4 py-2 text-sm font-bold text-white hyundai-blue-bg rounded-lg shadow hover:shadow-lg hover:opacity-90 transition-all transform hover:-translate-y-0.5">
+                  <span>+</span> Add Item
+                </button>
+              </div>
+
+              <div class="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+                ${
+                  state.requestedItems.length === 0
+                    ? `<div class="text-center py-16 bg-slate-50/50">
+                         <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-slate-100 mb-4">
+                            <svg class="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+                         </div>
+                         <p class="text-slate-500 font-medium">No items requested yet.</p>
+                         <p class="text-slate-400 text-sm mt-1">Click "Add Item" to start your list.</p>
+                       </div>`
+                    : `
+                      <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                          <thead>
+                            <tr class="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider border-b border-slate-200">
+                              <th class="py-4 px-6 font-semibold">Item</th>
+                              <th class="py-4 px-6 font-semibold">Detail / Specification</th>
+                              <th class="py-4 px-6 font-semibold w-32 text-center">Quantity</th>
+                              <th class="py-4 px-6 w-24"></th>
+                            </tr>
+                          </thead>
+                          <tbody class="divide-y divide-slate-100">
+                            ${state.requestedItems.map((item) => `
+                              <tr class="group hover:bg-slate-50/80 transition-colors">
+                                <td class="py-3 px-6 align-top">
+                                  <select id="item-${item.id}" class="modern-input w-full px-3 py-2.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-900/20 focus:border-blue-900 text-sm text-slate-700" required>
+                                    <option value="">Select an item...</option>
+                                    ${buildItemOptions(item.itemKey)}
+                                  </select>
+                                </td>
+                                <td class="py-3 px-6 align-top">
+                                  ${
+                                    item.itemKey === 'other'
+                                      ? `<input id="detail-${item.id}" type="text" placeholder="Please describe..." value="${item.detailKey || ''}"
+                                          class="modern-input w-full px-3 py-2.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-900/20 focus:border-blue-900 text-sm text-slate-700" required>`
+                                      : `<select id="detail-${item.id}" class="modern-input w-full px-3 py-2.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-900/20 focus:border-blue-900 text-sm text-slate-700" ${itemRequiresDetail(item.itemKey) ? 'required' : ''} ${itemRequiresDetail(item.itemKey) ? '' : 'disabled'}>
+                                          ${buildDetailOptions(item.itemKey, item.detailKey)}
+                                        </select>`
+                                  }
+                                </td>
+                                <td class="py-3 px-6 align-top">
+                                  <input type="number" min="1" step="1" value="${item.quantity}" id="qty-${item.id}"
+                                    class="modern-input w-full px-3 py-2.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-900/20 focus:border-blue-900 text-sm text-center font-medium text-slate-700">
+                                </td>
+                                <td class="py-3 px-6 align-top text-center">
+                                  <button type="button" class="removeBtn p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-all" data-id="${item.id}" title="Remove Item">
+                                    <svg class="w-5 h-5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                  </button>
+                                </td>
+                              </tr>
+                            `).join('')}
+                          </tbody>
+                        </table>
+                      </div>
+                    `
+                }
+              </div>
+            </section>
+
+            <div class="flex flex-col-reverse md:flex-row gap-4 justify-end pt-6 border-t border-slate-100 no-print">
+              <button id="clearBtn" type="button"
+                class="px-6 py-3 rounded-xl font-medium text-slate-500 hover:text-red-600 hover:bg-red-50 border border-transparent hover:border-red-100 transition-all">
+                Clear Form
+              </button>
+
+              <button id="submitBtn" type="button"
+                class="hyundai-blue-bg text-white px-10 py-3 rounded-xl font-bold tracking-wide shadow-lg shadow-blue-900/20 hover:shadow-blue-900/40 hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2">
+                <span>Submit Request</span>
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="p-6 bg-slate-50 text-center text-xs text-slate-400 border-t border-slate-100">
+            <p>For internal use only &bull; Sojitz de Puerto Rico &bull; Generated on ${formatDisplayDate(todayISO())}</p>
+          </div>
+        </div>
+      `;
+
+      // ==========================
+      // EVENTS (SIN CAMBIOS)
+      // ==========================
+      document.getElementById('name')?.addEventListener('input', (e) => updateFormData('name', e.target.value));
+      document.getElementById('department')?.addEventListener('change', (e) => updateFormData('department', e.target.value));
+      document.getElementById('position')?.addEventListener('input', (e) => updateFormData('position', e.target.value));
+      document.getElementById('email')?.addEventListener('input', (e) => updateFormData('email', e.target.value));
+
+      document.getElementById('contactExt')?.addEventListener('input', (e) => {
+        const digitsOnly = String(e.target.value || '').replace(/\D/g, '').slice(0, 4);
+        e.target.value = digitsOnly;
+        updateFormData('contactExt', digitsOnly);
+      });
+
+      document.getElementById('addItemBtn')?.addEventListener('click', addItemRow);
+      document.getElementById('clearBtn')?.addEventListener('click', handleClearForm);
+      document.getElementById('submitBtn')?.addEventListener('click', handleSubmit);
+
+      state.requestedItems.forEach((it) => {
+        const sel = document.getElementById(`item-${it.id}`);
+        const detail = document.getElementById(`detail-${it.id}`);
+        const qty = document.getElementById(`qty-${it.id}`);
+
+        sel?.addEventListener('change', (e) => {
+          const row = state.requestedItems.find(x => x.id === it.id);
+          if (row) { row.itemKey = e.target.value; row.detailKey = ''; render(); }
+        });
+
+        ['change','input'].forEach((evt) => {
+          detail?.addEventListener(evt, (e) => {
+            const row = state.requestedItems.find(x => x.id === it.id);
+            if (row) row.detailKey = e.target.value;
+          });
+        });
+
+        qty?.addEventListener('input', (e) => {
+          const row = state.requestedItems.find(x => x.id === it.id);
+          if (row) row.quantity = e.target.value;
+        });
+      });
+
+      document.querySelectorAll('.removeBtn')?.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          // El SVG puede ser el target, así que buscamos el botón más cercano
+          const btnEl = e.target.closest('button'); 
+          const id = Number(btnEl.getAttribute('data-id'));
+          removeItem(id);
+        });
+      });
+    }
+
+    // ==========================
+    // ITEMS, PDF & SUBMIT LOGIC (EXACTAMENTE IGUAL)
+    // ==========================
+    function addItemRow() {
+      state.requestedItems.push({
+        id: Date.now() + Math.floor(Math.random() * 1000),
+        itemKey: '',
+        detailKey: '',
+        quantity: 1
+      });
+      render();
+    }
+
+    function removeItem(id) {
+      state.requestedItems = state.requestedItems.filter(x => x.id !== id);
+      render();
+    }
+
+    function handleClearForm() {
+      if (!confirm('Clear the form?')) return;
+      clearFormSilent();
+    }
+
+    function generateAndDownloadPDF() {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF({ unit: 'mm', format: 'letter' }); 
+
+      const pageW = doc.internal.pageSize.getWidth();
+      const pageH = doc.internal.pageSize.getHeight();
+      const margin = 14;
+
+      const iso = todayISO();
+      const dateStr = formatDisplayDate(iso);
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(20);
+      doc.text('OFFICE SUPPLIES REQUISITION FORM', pageW / 2, 18, { align: 'center' });
+
+      let y = 30;
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.text('REQUESTER INFORMATION', margin, y);
+
+      y += 8;
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+
+      doc.text(`Name: ${state.formData.name || ''}`, margin, y);
+      doc.text(`Date: ${dateStr}`, pageW / 2, y);
+
+      y += 7;
+      doc.text(`Department: ${state.formData.department || ''}`, margin, y);
+      doc.text(`Position: ${state.formData.position || ''}`, pageW / 2, y);
+
+      y += 7;
+      doc.text(`Extension: ${state.formData.contactExt || ''}`, margin, y);
+      doc.text(`Email: ${state.formData.email || ''}`, pageW / 2, y);
+
+      y += 12;
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(11);
+      doc.text('REQUESTED ITEMS', margin, y);
+
+      y += 6;
+      const tableX = margin;
+      const tableW = pageW - margin * 2;
+      const qtyColW = 30;
+      const detailColW = 60;
+      const itemColW = tableW - qtyColW - detailColW;
+
+      const headerH = 8;
+      const rowH = 8;
+
+      doc.setDrawColor(0);
+      doc.setLineWidth(0.2);
+
+      doc.rect(tableX, y, tableW, headerH);
+      doc.line(tableX + itemColW, y, tableX + itemColW, y + headerH);
+      doc.line(tableX + itemColW + detailColW, y, tableX + itemColW + detailColW, y + headerH);
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.text('Item', tableX + 2, y + 5.6);
+      doc.text('Detail', tableX + itemColW + 2, y + 5.6);
+      doc.text('Quantity', tableX + itemColW + detailColW + qtyColW / 2, y + 5.6, { align: 'center' });
+
+      doc.setFont('helvetica', 'normal');
+      let rowsY = y + headerH;
+
+      const rows = state.requestedItems.map((it, idx) => ({
+        n: idx + 1,
+        item: getItemByKey(it.itemKey)?.label || '',
+        detail: it.detailKey ? (it.itemKey === 'other' ? it.detailKey : getDetailLabel(it.itemKey, it.detailKey)) : '',
+        qty: String(it.quantity || '')
+      }));
+
+      if (rows.length === 0) {
+        doc.rect(tableX, rowsY, tableW, rowH);
+        doc.line(tableX + itemColW, rowsY, tableX + itemColW, rowsY + rowH);
+        doc.line(tableX + itemColW + detailColW, rowsY, tableX + itemColW + detailColW, rowsY + rowH);
+      } else {
+        rows.forEach((r) => {
+          if (rowsY + rowH + 60 > pageH) {
+            doc.addPage();
+            y = 18;
+
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(14);
+            doc.text('OFFICE SUPPLIES REQUISITION FORM', pageW / 2, y, { align: 'center' });
+
+            y = 30;
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(11);
+            doc.text('REQUESTED ITEMS', margin, y);
+
+            y += 6;
+            doc.rect(tableX, y, tableW, headerH);
+            doc.line(tableX + itemColW, y, tableX + itemColW, y + headerH);
+            doc.line(tableX + itemColW + detailColW, y, tableX + itemColW + detailColW, y + headerH);
+
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(10);
+            doc.text('Item', tableX + 2, y + 5.6);
+            doc.text('Detail', tableX + itemColW + 2, y + 5.6);
+            doc.text('Quantity', tableX + itemColW + detailColW + qtyColW / 2, y + 5.6, { align: 'center' });
+
+            doc.setFont('helvetica', 'normal');
+            rowsY = y + headerH;
+          }
+
+          doc.rect(tableX, rowsY, tableW, rowH);
+          doc.line(tableX + itemColW, rowsY, tableX + itemColW, rowsY + rowH);
+          doc.line(tableX + itemColW + detailColW, rowsY, tableX + itemColW + detailColW, rowsY + rowH);
+
+          const itemText = `${r.n}. ${r.item}`;
+          doc.text(itemText, tableX + 2, rowsY + 5.6);
+          doc.text(r.detail || '', tableX + itemColW + 2, rowsY + 5.6);
+          doc.text(r.qty, tableX + itemColW + detailColW + qtyColW / 2, rowsY + 5.6, { align: 'center' });
+
+          rowsY += rowH;
+        });
+      }
+
+      let adminY = rowsY + 12;
+      if (adminY + 35 > pageH - 15) {
+        doc.addPage();
+        adminY = 30;
+      }
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(11);
+      doc.text('FOR ADMINISTRATION USE ONLY', margin, adminY);
+
+      adminY += 9;
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+
+      doc.text('AVP Approval: _______________________   Date: _______________', margin, adminY);
+      adminY += 9;
+      doc.text('Processed By: _______________________   Completion Date: _______________', margin, adminY);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.text('Sojitz de Puerto Rico dba Hyundai de Puerto Rico', pageW / 2, pageH - 12, { align: 'center' });
+
+      const filename = `Supply_Request_${safeFilenamePart(state.formData.name)}_${iso}.pdf`;
+      doc.save(filename);
+    }
+
+    function handleSubmit() {
+      const nameEl = document.getElementById('name');
+      const deptEl = document.getElementById('department');
+      const posEl  = document.getElementById('position');
+      const emailEl= document.getElementById('email');
+
+      if (![nameEl, deptEl, posEl, emailEl].every(el => el && el.checkValidity())) {
+        const firstInvalid = [nameEl, deptEl, posEl, emailEl].find(el => el && !el.checkValidity());
+        firstInvalid?.reportValidity();
+        return;
+      }
+
+      state.formData.date = todayISO();
+
+      if (state.requestedItems.length === 0) {
+        alert('Please add at least one item to your request.');
+        return;
+      }
+
+      const badRow = state.requestedItems.find(it =>
+        !it.itemKey ||
+        !it.quantity ||
+        Number(it.quantity) < 1 ||
+        (itemRequiresDetail(it.itemKey) && !it.detailKey) || (it.itemKey === 'other' && !String(it.detailKey || '').trim())
+      );
+      if (badRow) {
+        alert('Please select an item, select a detail when required, and enter a valid quantity for each line.');
+        return;
+      }
+
+      generateAndDownloadPDF();
+
+      const subject = encodeURIComponent(`Office Supply Request Submitted`);
+      const bodyLines = [
+        `Dear Administration,`,
+        ``,
+        `I hope you are doing well. A new office supply request has been submitted.`,
+        ``,
+        `REQUESTER INFORMATION:`,
+        `Name: ${state.formData.name}`,
+        `Date: ${formatDisplayDate(state.formData.date)}`,
+        ``,
+        `REQUESTED ITEMS:`,
+        ...state.requestedItems.map((it, idx) => `${idx + 1}. ${getLineDescription(it)} - Quantity: ${it.quantity}`),
+        ``,
+        `I've attached the detailed PDF to this email.`,
+        `Best regards,`,
+        `Office Supply System`
+      ];
+
+      const body = encodeURIComponent(bodyLines.join('\n'));
+      const recipient = 'supplies@hyundaipr.com';
+      window.location.href = `mailto:${recipient}?subject=${subject}&body=${body}`;
+
+      setTimeout(() => {
+        clearFormSilent();
+      }, 350);
+    }
+
+    // ==========================
+    // INIT
+    // ==========================
+    state.formData.date = todayISO();
+    render();
+  </script>
+</body>
+</html>
